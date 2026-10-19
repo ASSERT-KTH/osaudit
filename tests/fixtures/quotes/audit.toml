@@ -1,0 +1,37 @@
+[paper]
+tex = ["paper.tex"]
+
+[[quotes]]
+key = "doe2001archive"
+text = "We call the archive the second memory of a laboratory, after the minds of its members."
+version = "publisher"
+url = "https://doi.org/10.1000/doe2001"
+page = "12"
+date = "2026-10-01"
+status = "verified"
+
+[[quotes]]
+key = "roe1999notes"
+text = "A notebook is read more often than it is written."
+version = "author-pdf"
+url = "https://example.org/roe1999.pdf"
+page = "3"
+date = "2026-10-02"
+status = "verified"
+
+[[quotes]]
+key = "poe2010"
+text = "Every measurement, however simple, carries its instrument with it."
+version = "reprint"
+url = "https://example.org/poe-reprint"
+page = "40-45"
+date = "2026-10-03"
+status = "verified"
+
+[[quotes]]
+key = "moe2020"
+text = "Tools shape questions as much as questions shape tools."
+version = "abstract"
+url = "https://example.org/moe2020"
+date = "2026-10-04"
+status = "verified"

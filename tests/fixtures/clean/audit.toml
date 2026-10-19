@@ -1,0 +1,22 @@
+[paper]
+tex = ["paper/*.tex"]
+
+[results]
+files = ["results/*.json"]
+
+[[numbers.derive]]
+value = "392"
+expr = "panel.overall.total - panel.overall.answers.yes"
+
+[[numbers.derive]]
+value = "67.4%"
+expr = "panel.overall.answers.yes / panel.overall.total"
+
+[[numbers.derive]]
+value = "19.7%"
+expr = "survey.partial / survey.responses"
+
+[[numbers.allow]]
+value = "2,000,000"
+reason = "population size published by the cited census"
+cite = "census"

@@ -1,0 +1,18 @@
+# A share first printed from ages computed against now() at analysis time.
+[paper]
+tex = ["paper/*.tex"]
+
+[results]
+files = ["results/*.json"]
+
+[[numbers.derive]]
+value = "70.0%"
+expr = 'ages.by_age["<30"].holds / ages.by_age["<30"].informative'
+
+[[numbers.allow]]
+value = "30"
+reason = "age bucket boundary, a parameter of the instrument"
+
+[[numbers.allow]]
+value = "90"
+reason = "age bucket boundary, a parameter of the instrument"
