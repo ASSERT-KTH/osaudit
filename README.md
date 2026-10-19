@@ -96,7 +96,7 @@ A quote is ` ``...'' ` with a citation in the same sentence (the nearest after i
 
 ## Status
 
-`numbers`, `quotes`, `results` and `run` are implemented. `refs` and `review` are specified in CONVENTIONS.md and not yet built; they will be subcommands of `osaudit` too.
+`numbers`, `quotes`, `results` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in CONVENTIONS.md and not built.
 
 ## License
 

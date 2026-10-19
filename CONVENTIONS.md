@@ -51,7 +51,7 @@ Each rule is normative (MUST) and names the failure it prevents. Rule ids (`numb
 ## References
 
 - A source is cited for a position it holds, not for one it refutes or does not address; the ledger entry records the claim the citation supports. *Prevents: citing a paper for the position it refutes, or a study of one measure for another measure.*
-- Every cited BibTeX entry has a verification record (date, what was checked, against which source) and a DOI or a URL. *Prevents: references with invented fields.*
+- Every BibTeX entry describes a paper that exists, with its authors, year and DOI: [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations) is silent on the `.bib` (a separate tool, not an `osaudit` check). *Prevents: references with an invented title, or a real title with invented authors, year or DOI.*
 - Every cross-reference resolves, and the text names what it points to. *Prevents: text pointing to an example removed in an earlier revision.*
 
 ## Reviews
