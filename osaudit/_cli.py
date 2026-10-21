@@ -18,7 +18,7 @@ from ._findings import Finding
 from ._git import GitError
 from ._pdf import PdfError
 
-CONVENTIONS = ("https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/"
+CONVENTIONS = ("https://github.com/ASSERT-KTH/assert-research-agent/blob/main/"
                "CONVENTIONS.md")
 
 

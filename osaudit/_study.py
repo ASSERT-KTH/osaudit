@@ -3,7 +3,7 @@
 A results file is confirmatory when its provenance says `"mode": "confirmatory"` and names its
 pre-registration in `"study"`; exploratory with `"mode": "exploratory"` and its exploration log.
 A file without a mode is unlabelled: never confirmatory, and its inputs count as seen.
-Formats: CONVENTIONS.md of https://github.com/ASSERT-KTH/agentic-scientifc-method (Study).
+Formats: CONVENTIONS.md of https://github.com/ASSERT-KTH/assert-research-agent (Study).
 
 Rules, for every confirmatory results file:
   study/not-preregistered  its pre-registration is absent at the recorded commit, or has no

@@ -220,7 +220,7 @@ def _entries(text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
 def load(root: Path, path: Path | None = None) -> Config:
     path = path or root / "audit.toml"
     if not path.is_file():
-        raise ConfigError(f"{path}: no audit.toml (see https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/CONVENTIONS.md)")
+        raise ConfigError(f"{path}: no audit.toml (see https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md)")
     text = path.read_text()
     try:
         data = tomllib.loads(text)

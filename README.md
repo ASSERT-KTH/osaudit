@@ -2,7 +2,7 @@
 
 Automated open-science audit: report every claim of a scientific paper that is not traced, mechanically, to the evidence that supports it. A number to a results file, a quote to a page of a verified source, a result to the instrument and the input that produced it. Silent when everything is traced.
 
-What a repository must contain to be auditable is specified in the [conventions](https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/CONVENTIONS.md), shared with the [research agent](https://github.com/ASSERT-KTH/agentic-scientifc-method), which enforces them while the work is done; `osaudit` checks them afterwards, from the repository alone.
+What a repository must contain to be auditable is specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md), shared with the [research agent](https://github.com/ASSERT-KTH/assert-research-agent), which enforces them while the work is done; `osaudit` checks them afterwards, from the repository alone.
 
 ## Install
 
@@ -120,7 +120,7 @@ A quote is ` ``...'' ` with a citation in the same sentence (the nearest after i
 
 ## Status
 
-`numbers`, `quotes`, `results`, `study` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/CONVENTIONS.md) and not built.
+`numbers`, `quotes`, `results`, `study` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md) and not built.
 
 ## License
 
