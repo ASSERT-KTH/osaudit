@@ -3,6 +3,8 @@
     [paper]
     tex = ["paper/sections/*.tex"]     # LaTeX sources, audited when present
     pdf = "paper/main.pdf"             # audited when no tex is declared
+    md = ["findings-*.md"]             # Markdown documents, audited when they have TOML front
+                                       # matter (+++ ... +++); others are skipped
 
     [results]
     files = ["study/results/*.json"]
@@ -57,6 +59,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ._frontmatter import front_matter, span
 from ._number import Num, parse
 
 
@@ -161,6 +164,7 @@ class Config:
     depends: tuple[Depends, ...] = ()
     quotes: tuple[Quote, ...] = ()
     study: Study = Study()
+    md: tuple[Path, ...] = ()
 
     def rel(self, p: Path) -> str:
         try:
@@ -228,10 +232,11 @@ def load(root: Path, path: Path | None = None) -> Config:
         raise ConfigError(f"{path}: {e}") from e
     paper = data.get("paper", {})
     tex = _glob(root, paper["tex"], "paper.tex") if "tex" in paper else ()
+    md = _markdown(_glob(root, paper["md"], "paper.md")) if "md" in paper else ()
     pdf = None
-    if not tex:
+    if not tex and ("pdf" in paper or not md):
         if "pdf" not in paper:
-            raise ConfigError(f"{path}: [paper] declares neither tex nor pdf")
+            raise ConfigError(f"{path}: [paper] declares neither tex, pdf nor md")
         pdf = root / paper["pdf"]
         if not pdf.is_file():
             raise ConfigError(f"paper.pdf: {paper['pdf']!r} is not a file")
@@ -245,7 +250,21 @@ def load(root: Path, path: Path | None = None) -> Config:
                   tuple(_manual(text, res.get("manual", []))),
                   tuple(_depends(root, text, res.get("depends", []))),
                   tuple(_quotes(text, data.get("quotes", []))),
-                  _study(data.get("study", {})))
+                  _study(data.get("study", {})), md)
+
+
+def _markdown(files: tuple[Path, ...]) -> tuple[Path, ...]:
+    """The Markdown documents that are audited: those with TOML front matter, which must parse."""
+    out = []
+    for f in files:
+        text = f.read_text()
+        if not span(text):
+            continue
+        fm, why = front_matter(text)
+        if fm is None:
+            raise ConfigError(f"{f}: {why}")
+        out.append(f)
+    return tuple(out)
 
 
 def study_context(root: Path) -> tuple[Study, list[Path]]:

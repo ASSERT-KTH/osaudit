@@ -20,7 +20,7 @@ import re
 from collections.abc import Iterable, Iterator
 from decimal import Decimal
 
-from . import _pdf, _study, _tex
+from . import _md, _pdf, _study, _tex
 from ._config import Config
 from ._findings import Finding
 from ._number import Num, close
@@ -34,6 +34,8 @@ def paper_numbers(cfg: Config) -> Iterator[Num]:
         yield from _tex.numbers(cfg.rel(f), f.read_text())
     if cfg.pdf is not None:
         yield from _pdf.numbers(cfg.rel(cfg.pdf), _pdf.text_of(cfg.pdf))
+    for f in cfg.md:
+        yield from _md.numbers(cfg.rel(f), f.read_text())
 
 
 def _printed(v: Decimal) -> str:
@@ -94,9 +96,10 @@ def _expr_stems(expr: str) -> set[str]:
 
 
 def _contexts(cfg: Config) -> dict[str, list[str]]:
-    """For each paper file, the text around each line: its paragraph (LaTeX) or page (PDF)."""
+    """For each paper file, the text around each line: its paragraph (LaTeX, Markdown) or page
+    (PDF)."""
     out: dict[str, list[str]] = {}
-    for f in cfg.tex:
+    for f in (*cfg.tex, *cfg.md):
         lines = f.read_text().splitlines()
         paragraphs, start = [], 0
         for i, line in enumerate([*lines, ""]):

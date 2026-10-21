@@ -17,6 +17,7 @@ In the paper repository, write `audit.toml`:
 ```toml
 [paper]
 tex = ["paper/sections/*.tex"]      # or: pdf = "paper/main.pdf"
+md = ["findings-*.md"]              # Markdown documents with TOML front matter (others skipped)
 
 [results]                           # optional: a paper without a study audits its quotes only
 files = ["study/results/*.json"]
@@ -114,13 +115,17 @@ Candidates proposed for an untraced number are single operations over counts (su
 
 LaTeX comments, `tikzpicture` and verbatim environments, verbatim quotes (` ``...'' `, audited as quotes), arguments of `\input \label \cref \cite \url \begin` and similar, parts of a document (`Section 4.3`, `Table~1`, `p.~107`), and numbers glued to a word (`123d0d04`, `3.0cm`, `RQ1`). In a PDF: numbered citations, list labels, lines holding only a number, and everything after the last "References" heading.
 
+### Markdown documents
+
+A Markdown document (`[paper] md`, alone or with LaTeX or a PDF) is audited only when it starts with TOML front matter (`+++ ... +++`): the structured data marks it as a document whose numbers are meant to be traced, such as a findings file or a report. Without front matter it is skipped; front matter that does not parse stops the audit. Its numbers are audited as a paper's; not audited are the front matter itself (data, not prose), fenced and inline code, link and image targets, HTML comments, double-quoted text, dates (`2026-10-20`), parts of a document, list labels and table separator rows. In a range with one percent sign (`89–100%`), both ends are percents. The context of `numbers/exploratory-unlabelled` is the paragraph. Quotes are audited in LaTeX and PDF only.
+
 ### Quotes
 
 A quote is ` ``...'' ` with a citation in the same sentence (the nearest after it, else before it); its page is the `p.~X` of that citation. It must be verbatim, after normalization of LaTeX, typography and case, in the full sentence of an entry for that key; `[...]` marks a cut. In a PDF, citations are numbered, so a quote `“...”` matches any entry by its text.
 
 ## Status
 
-`numbers`, `quotes`, `results`, `study` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md) and not built.
+`numbers` (LaTeX, PDF, Markdown), `quotes` (LaTeX, PDF), `results`, `study` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md) and not built.
 
 ## License
 

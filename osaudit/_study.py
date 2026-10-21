@@ -20,8 +20,6 @@ from __future__ import annotations
 
 import json
 import posixpath
-import re
-import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,23 +28,14 @@ from typing import Any
 from . import _git, _provenance
 from ._config import Config, study_context
 from ._findings import Finding
+from ._frontmatter import front_matter
 
-FRONT = re.compile(r"\A\+\+\+[ \t]*\n(.*?)\n\+\+\+[ \t]*(?:\n|\Z)", re.DOTALL)
+__all__ = ["check", "front_matter", "precheck", "prereg_problems"]
+
 MODES = ("confirmatory", "exploratory")
 TEXT_FIELDS = ("hypothesis", "null", "statistic", "go", "stop", "disaster")
 LIST_FIELDS = ("experiments", "data")
 CORRECTIONS = ("holm", "bonferroni", "hochberg", "benjamini-hochberg", "none")
-
-
-def front_matter(text: str) -> tuple[dict[str, Any] | None, str]:
-    """The TOML front matter (between `+++` lines at the top) of a Markdown file."""
-    m = FRONT.match(text)
-    if not m:
-        return None, "no TOML front matter (+++ ... +++ at the top)"
-    try:
-        return tomllib.loads(m.group(1)), ""
-    except tomllib.TOMLDecodeError as e:
-        return None, f"front matter: {e}"
 
 
 def prereg_problems(fm: dict[str, Any]) -> list[str]:
