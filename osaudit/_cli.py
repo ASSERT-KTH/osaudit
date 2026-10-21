@@ -12,11 +12,14 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from . import __version__, _numbers, _provenance, _quotes, _results_check
+from . import __version__, _numbers, _provenance, _quotes, _results_check, _study
 from ._config import Config, ConfigError, instruments, load
 from ._findings import Finding
 from ._git import GitError
 from ._pdf import PdfError
+
+CONVENTIONS = ("https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/"
+               "CONVENTIONS.md")
 
 
 def _results(cfg: Config, args: argparse.Namespace) -> list[Finding]:
@@ -32,6 +35,8 @@ CHECKS: dict[str, tuple[Callable[[Config, argparse.Namespace], list[Finding]], s
                "every cited verbatim quote in a verified [[quotes]] entry, with its page"),
     "results": (_results,"every results file has a provenance that still holds "
                           "(static; --inputs, --rerun to go further)"),
+    "study": (lambda cfg, _: _study.check(cfg),
+              "every confirmatory result pre-registered, unamended after data, on unseen data"),
 }
 
 
@@ -40,8 +45,8 @@ def parser() -> argparse.ArgumentParser:
         prog="osaudit",
         description="Audit a paper repository: report every claim not traced to its evidence. "
                     "Silent when clean; `file:line: rule: message` per finding. "
-                    "Conventions: CONVENTIONS.md. Without a check name, runs every check "
-                    "(static parts only).",
+                    f"Conventions: {CONVENTIONS}. "
+                    "Without a check name, runs every check (static parts only).",
         epilog="exit status: 0 clean, 1 findings, 2 the audit could not run",
     )
     p.add_argument("--version", action="version", version=f"osaudit {__version__}")
@@ -73,6 +78,12 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--input", type=Path, action="append", default=[], dest="input_paths",
                      help="an input file or directory (repeat for each)")
     run.add_argument("-o", "--output", type=Path, required=True, help="results file to write")
+    mode = run.add_mutually_exclusive_group()
+    mode.add_argument("--prereg", metavar="FILE",
+                      help="a CONFIRMATORY run under this committed pre-registration; refused "
+                           "unless `osaudit study` would accept the result")
+    mode.add_argument("--explore", metavar="FILE",
+                      help="an EXPLORATORY run, logged in this exploration log")
     run.add_argument("cmd", nargs=argparse.REMAINDER, help="-- CMD [ARG ...]")
     return p
 
@@ -86,8 +97,13 @@ def _run(args: argparse.Namespace) -> int:
     try:
         output = args.output.resolve()
         out_rel = str(output.relative_to(root)) if output.is_relative_to(root) else str(output)
-        _provenance.run(root, cmd, args.input_paths, args.output, instruments(root, out_rel))
-    except (_provenance.RunError, ConfigError, GitError, OSError) as e:
+        study = args.prereg or args.explore
+        if study:
+            study = Path(study).resolve().relative_to(root).as_posix()
+        mode = "confirmatory" if args.prereg else "exploratory" if args.explore else None
+        _provenance.run(root, cmd, args.input_paths, args.output, instruments(root, out_rel),
+                        mode, study, _study.precheck(root, out_rel) if mode else None)
+    except (_provenance.RunError, ConfigError, GitError, OSError, ValueError) as e:
         print(f"osaudit run: {e}", file=sys.stderr)
         return 2
     return 0

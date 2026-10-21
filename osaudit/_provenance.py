@@ -6,7 +6,9 @@
       "inputs": [{"path": "data/answers.csv", "sha256": "e3b0..."}],
       "commit": "<40 hex: git HEAD, tree clean, when the command ran>",
       "now": "2026-10-19T10:00:00+00:00",
-      "osaudit": "0.1.0"
+      "mode": "confirmatory",               # optional: confirmatory|exploratory
+      "study": "prereg/2026-10-19-x.md",    # with mode: the pre-registration, or the log
+      "osaudit": "0.2.0"
     }
 
 `now` is the time anchor: the command runs with it in `OSAUDIT_NOW`, and an instrument reads it
@@ -22,6 +24,7 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +36,7 @@ KEY = "provenance"
 ENV_NOW = "OSAUDIT_NOW"
 HEX64 = re.compile(r"[0-9a-f]{64}")
 HEX40 = re.compile(r"[0-9a-f]{40}")
+MODES = ("confirmatory", "exploratory")
 
 
 class RunError(Exception):
@@ -69,6 +73,8 @@ class Provenance:
     inputs: list[dict[str, str]]
     commit: str
     now: str
+    mode: str | None = None
+    study: str | None = None
 
     def resolve(self, root: Path, path: str) -> Path:
         p = Path(path)
@@ -100,7 +106,15 @@ def parse(doc: Any) -> tuple[Provenance | None, str]:
         return None, "now must be an ISO 8601 time"
     if now.tzinfo is None:
         return None, "now must carry a time zone"
-    return Provenance(cmd, str(p.get("cwd", ".")), inputs, p["commit"], p["now"]), ""
+    mode, study = p.get("mode"), p.get("study")
+    if mode is not None and mode not in MODES:
+        return None, f"mode must be one of {', '.join(MODES)}"
+    if study is not None and not (isinstance(study, str) and study):
+        return None, "study must be the path of the pre-registration or exploration log"
+    if mode is None and study is not None:
+        return None, "study without a mode"
+    return Provenance(cmd, str(p.get("cwd", ".")), inputs, p["commit"], p["now"],
+                      mode, study), ""
 
 
 def execute(cmd: list[str], cwd: Path, now: str, timeout: float | None = None) -> Any:
@@ -123,12 +137,15 @@ def execute(cmd: list[str], cwd: Path, now: str, timeout: float | None = None) -
 
 
 def run(root: Path, cmd: list[str], inputs: list[Path], output: Path,
-        instruments: list[str] | None = None) -> None:
+        instruments: list[str] | None = None, mode: str | None = None, study: str | None = None,
+        precheck: Callable[[Provenance], list[str]] | None = None) -> None:
     """Run an instrument and write its results with their provenance to `output`.
 
     The recorded commit holds only if the instruments are committed: those must be clean
     (every tracked file but `output` when no instruments are declared), while results files
-    regenerated in the same session may be.
+    regenerated in the same session may be. `mode` and `study` label the run; `precheck`,
+    given the provenance to be recorded, lists why the run must not happen (a confirmatory
+    run that `osaudit study` would reject is refused before it sees the data).
     """
     root = root.resolve()
     if not inputs:
@@ -144,7 +161,13 @@ def run(root: Path, cmd: list[str], inputs: list[Path], output: Path,
     now = os.environ.get(ENV_NOW) or datetime.now(UTC).isoformat(timespec="seconds")
     commit = _git.head(root)
     hashed = [{"path": _shown(i, root), "sha256": sha256(i)} for i in inputs]
+    cwd = _shown(Path.cwd(), root)
+    if precheck is not None:
+        problems = precheck(Provenance(cmd, cwd, hashed, commit, now, mode, study))
+        if problems:
+            raise RunError("refused: " + "; ".join(problems))
     out = execute(cmd, Path.cwd(), now)
-    out[KEY] = {"command": cmd, "cwd": _shown(Path.cwd(), root), "inputs": hashed,
-                "commit": commit, "now": now, "osaudit": __version__}
+    labels = {"mode": mode, "study": study} if mode else {}
+    out[KEY] = {"command": cmd, "cwd": cwd, "inputs": hashed, "commit": commit, "now": now,
+                **labels, "osaudit": __version__}
     output.write_text(json.dumps(out, indent=1) + "\n")

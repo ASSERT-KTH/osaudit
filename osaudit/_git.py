@@ -37,6 +37,24 @@ def has_commit(root: Path, commit: str) -> bool:
     return True
 
 
+def show(root: Path, commit: str, path: str) -> str | None:
+    """The text of `path` (relative to `root`) at `commit`, or None when absent there."""
+    try:
+        return _git(root, "show", f"{commit}:./{path}")
+    except GitError:
+        return None
+
+
+def first_commit(root: Path, path: str) -> str | None:
+    """The oldest commit that touched `path`, or None when never committed."""
+    out = _git(root, "log", "--format=%H", "--", path).split()
+    return out[-1] if out else None
+
+
+def tracked(root: Path, path: str) -> bool:
+    return bool(_git(root, "ls-files", "--", path).strip())
+
+
 def changed_since(root: Path, commit: str, paths: list[str]) -> list[str]:
     """Of `paths`, those that differ between `commit` and the working tree."""
     if not paths:

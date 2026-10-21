@@ -5,16 +5,22 @@ Rules:
   numbers/derive-mismatch  a derivation evaluates to another value than the one it declares
   numbers/derive-unknown   a derivation names a results value that does not exist
   numbers/unused           a derivation or allow entry matches no number of the paper
+  numbers/exploratory-unlabelled
+                           a number traced to exploratory results (provenance mode, see
+                           `osaudit study`) whose paragraph (in a PDF, page) does not say
+                           "exploratory": a derivation is exploratory when any operand is, a
+                           direct match when every matching value is
 """
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 from collections.abc import Iterable, Iterator
 from decimal import Decimal
 
-from . import _pdf, _tex
+from . import _pdf, _study, _tex
 from ._config import Config
 from ._findings import Finding
 from ._number import Num, close
@@ -74,6 +80,62 @@ def candidates(n: Num, values: dict[str, Decimal]) -> list[str]:
     return sorted(out, key=rank)[:MAX_CANDIDATES]
 
 
+def _stem(name: str) -> str:
+    return re.split(r"[.\[ ]", name, maxsplit=1)[0]
+
+
+def _expr_stems(expr: str) -> set[str]:
+    """The results files an expression reads: the root name of each operand."""
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        return set()
+    return {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+
+
+def _contexts(cfg: Config) -> dict[str, list[str]]:
+    """For each paper file, the text around each line: its paragraph (LaTeX) or page (PDF)."""
+    out: dict[str, list[str]] = {}
+    for f in cfg.tex:
+        lines = f.read_text().splitlines()
+        paragraphs, start = [], 0
+        for i, line in enumerate([*lines, ""]):
+            if not line.strip():
+                paragraphs += ["\n".join(lines[start:i])] * (i - start + 1)
+                start = i + 1
+        out[cfg.rel(f)] = ["", *paragraphs]
+    if cfg.pdf is not None:
+        out[cfg.rel(cfg.pdf)] = ["", *_pdf.pages(_pdf.text_of(cfg.pdf))]
+    return out
+
+
+def exploratory_unlabelled(cfg: Config, results: Results) -> list[Finding]:
+    modes = _study.modes(cfg)
+    exploratory = {s for s, m in modes.items() if m == "exploratory"}
+    if not exploratory:
+        return []
+    contexts = _contexts(cfg)
+    out = []
+    for n in paper_numbers(cfg):
+        entries = [e for e in cfg.entries if e.covers(n)]
+        if entries:
+            stems = {s for e in entries if e.expr for s in _expr_stems(e.expr)}
+            tainted = bool(stems & exploratory)
+        else:
+            stems = {_stem(k) for k, v in results.values.items() if close(n, v)}
+            tainted = bool(stems) and stems <= exploratory
+        if not tainted:
+            continue
+        lines = contexts.get(n.file, [])
+        context = lines[n.line] if n.line < len(lines) else ""
+        if "exploratory" not in context.lower():
+            out.append(Finding(n.file, n.line, "numbers/exploratory-unlabelled",
+                               f"{n.text} comes from exploratory results "
+                               f"({', '.join(sorted(stems & exploratory))}); say so where it is "
+                               "printed: its p-values and intervals are not calibrated"))
+    return out
+
+
 def check(cfg: Config) -> list[Finding]:
     results = Results.load(list(cfg.results))
     values = list(results.values.values())
@@ -115,6 +177,7 @@ def check(cfg: Config) -> list[Finding]:
             where = f" in {e.file}" if e.file else ""
             findings.append(Finding(toml, e.line, "numbers/unused",
                                     f"{e.kind} {e.num.text} matches no number of the paper{where}"))
+    findings += exploratory_unlabelled(cfg, results)
     return sorted(findings, key=lambda f: (f.file, f.line, f.rule, f.message))
 
 

@@ -39,6 +39,13 @@
     status = "verified"                # verified|unverified
     claim = "what the citation supports"   # optional
 
+    [study]                            # optional: the study directories (defaults shown)
+    prereg = "prereg"
+    explore = "explore"                # exploration logs: their data_seen counts as seen
+    experiments = "experiments"
+    results = "results"                # results files for `run`, when [results] files is absent
+    report = ["REPORT.md", "NOTES.md", "README.md"]
+
 `[results]` is optional: a paper without a study audits its quotes and references only.
 """
 
@@ -113,6 +120,35 @@ class Quote:
 
 
 @dataclass(frozen=True)
+class Study:
+    """`[study]`: where a study keeps its pre-registrations, logs, experiments, results, report.
+
+    Shared with the research-agent hooks; every key is optional.
+    """
+
+    prereg: str = "prereg"
+    explore: str = "explore"
+    experiments: str = "experiments"
+    results: str = "results"
+    report: tuple[str, ...] = ("REPORT.md", "NOTES.md", "README.md")
+
+
+def _study(raw: Any) -> Study:
+    if not isinstance(raw, dict):
+        raise ConfigError("study must be a table ([study])")
+    for k, v in raw.items():
+        if k not in Study.__dataclass_fields__:
+            raise ConfigError(f"study.{k}: unknown key")
+        if k == "report":
+            if not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
+                raise ConfigError("study.report must be a list of paths")
+        elif not (isinstance(v, str) and v):
+            raise ConfigError(f"study.{k} must be a directory path")
+    report = tuple(raw.pop("report")) if "report" in raw else Study.report
+    return Study(**raw, report=report)
+
+
+@dataclass(frozen=True)
 class Config:
     root: Path
     path: Path
@@ -124,6 +160,7 @@ class Config:
     manual: tuple[Manual, ...] = ()
     depends: tuple[Depends, ...] = ()
     quotes: tuple[Quote, ...] = ()
+    study: Study = Study()
 
     def rel(self, p: Path) -> str:
         try:
@@ -183,7 +220,7 @@ def _entries(text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
 def load(root: Path, path: Path | None = None) -> Config:
     path = path or root / "audit.toml"
     if not path.is_file():
-        raise ConfigError(f"{path}: no audit.toml (see CONVENTIONS.md)")
+        raise ConfigError(f"{path}: no audit.toml (see https://github.com/ASSERT-KTH/agentic-scientifc-method/blob/main/CONVENTIONS.md)")
     text = path.read_text()
     try:
         data = tomllib.loads(text)
@@ -207,7 +244,29 @@ def load(root: Path, path: Path | None = None) -> Config:
                   _glob(root, instruments, "results.instruments") if instruments else (),
                   tuple(_manual(text, res.get("manual", []))),
                   tuple(_depends(root, text, res.get("depends", []))),
-                  tuple(_quotes(text, data.get("quotes", []))))
+                  tuple(_quotes(text, data.get("quotes", []))),
+                  _study(data.get("study", {})))
+
+
+def study_context(root: Path) -> tuple[Study, list[Path]]:
+    """`[study]` and the results files, for `osaudit run`, which may run before a paper exists.
+
+    The results files are `[results] files` when declared, else every JSON file under
+    `[study] results`.
+    """
+    path = root / "audit.toml"
+    data: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            data = tomllib.loads(path.read_text())
+        except tomllib.TOMLDecodeError as e:
+            raise ConfigError(f"{path}: {e}") from e
+    study = _study(data.get("study", {}))
+    files = data.get("results", {}).get("files")
+    if files:
+        return study, [p for pat in ([files] if isinstance(files, str) else files)
+                       for p in sorted(root.glob(pat))]
+    return study, sorted((root / study.results).rglob("*.json"))
 
 
 def _quotes(text: str, raw: Any) -> list[Quote]:
