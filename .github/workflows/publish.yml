@@ -1,17 +1,66 @@
 name: Publish to PyPI
 
+# Continuous delivery: every push to main whose pyproject version has no tag yet is tested,
+# published to PyPI, then tagged v<version> with a GitHub release. Bumping the version is the
+# whole release procedure. A release published by hand still publishes (its tag already exists).
+# The file name is bound to PyPI's trusted publisher: keep it.
+
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - id: v
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = release ]; then
+            echo "new=release" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: version
+    if: needs.version.outputs.new != 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: "3.14"
+      - run: uv venv && uv pip install -e '.[dev]'
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/mypy osaudit tests
+      - run: .venv/bin/pytest -q
+
   publish:
+    needs: [version, test]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write  # trusted publishing, no token
+      contents: write  # tag and GitHub release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+      - if: needs.version.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v${{ needs.version.outputs.version }}" dist/*
+          --target "${{ github.sha }}" --title "osaudit ${{ needs.version.outputs.version }}"
+          --generate-notes
