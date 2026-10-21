@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from osaudit._cli import main
-from osaudit._config import ConfigError, load
+from osaudit._config import AUDIT, ConfigError, load
 from osaudit._number import parse
 from osaudit._numbers import candidates, check
 from osaudit._results import Results
@@ -48,7 +48,7 @@ def test_stale_share_derivation_mismatch(capsys: pytest.CaptureFixture[str]) -> 
     assert main(["numbers", "--root", str(FIXTURES / "stale-age")]) == 1
     out = capsys.readouterr().out.splitlines()
     assert len(out) == 1
-    assert out[0].startswith("audit.toml:8: numbers/derive-mismatch: 70.0% declared")
+    assert out[0].startswith("audit.toml:10: numbers/derive-mismatch: 70.0% declared")
     assert out[0].endswith("printed 62.5%")
 
 
@@ -73,20 +73,20 @@ def test_cited_count_without_allow(repo: Path) -> None:  # a count published by 
 
 def test_unused_entry(repo: Path) -> None:  # an allow entry that outlived its text
     edit(repo / "paper/results.tex", "2,000,000", "two million")
-    assert rules(repo) == [("audit.toml", 19, "numbers/unused")]
+    assert rules(repo) == [("audit.toml", 21, "numbers/unused")]
 
 
 def test_allow_restricted_to_file(repo: Path) -> None:  # boundary: right value, other file
     toml = repo / "audit.toml"
     toml.write_text(toml.read_text() + 'file = "paper/other.tex"\n')
-    assert sorted(rules(repo)) == [("audit.toml", 19, "numbers/unused"),
+    assert sorted(rules(repo)) == [("audit.toml", 21, "numbers/unused"),
                                    ("paper/results.tex", 11, "numbers/untraced")]
 
 
 def test_unknown_value_in_expr(repo: Path) -> None:
     edit(repo / "audit.toml", "panel.overall.total - ", "panel.overall.totl - ")
     findings = check(load(repo))
-    assert [(f.line, f.rule) for f in findings] == [(7, "numbers/derive-unknown")]
+    assert [(f.line, f.rule) for f in findings] == [(9, "numbers/derive-unknown")]
     assert "panel.overall.totl" in findings[0].message
 
 
@@ -97,7 +97,7 @@ def test_allow_needs_reason(repo: Path) -> None:
 
 
 def test_bad_config_exits_2(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (repo / "audit.toml").write_text("[paper]\ntex = ['nothing/*.tex']\n")
+    (repo / "audit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['nothing/*.tex']\n")
     assert main(["numbers", "--root", str(repo)]) == 2
     assert "matches no file" in capsys.readouterr().err
 

@@ -58,6 +58,8 @@ data_seen = ["data/train.csv"]
 """
 
 AUDIT = """\
+schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/audit-v1.json"
+
 [paper]
 tex = ["paper.tex"]
 

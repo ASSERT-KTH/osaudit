@@ -80,7 +80,7 @@ def test_same_page() -> None:
 
 def test_missing_entry(repo: Path) -> None:  # known-positive: a quote no one checked
     edit(repo / "paper.tex", "\\cite{moe2020}", "\\cite{zoe2021}")
-    assert rules(repo) == [("audit.toml", 31, "quotes/unused"),
+    assert rules(repo) == [("audit.toml", 33, "quotes/unused"),
                            ("paper.tex", 7, "quotes/no-entry")]
 
 
@@ -88,8 +88,8 @@ def test_quote_not_in_source(repo: Path) -> None:  # a sentence the author never
     edit(repo / "paper.tex", "the second memory of a laboratory", "the only memory of a laboratory")
     found = check(load(repo))
     assert [(f.file, f.line, f.rule) for f in found] == [
-        ("audit.toml", 4, "quotes/unused"), ("paper.tex", 2, "quotes/mismatch")]
-    assert "closest: audit.toml:4" in found[1].message
+        ("audit.toml", 6, "quotes/unused"), ("paper.tex", 2, "quotes/mismatch")]
+    assert "closest: audit.toml:6" in found[1].message
 
 
 def test_wrong_page(repo: Path) -> None:
@@ -107,17 +107,17 @@ def test_page_for_abstract(repo: Path) -> None:  # a page invented for an abstra
     edit(repo / "paper.tex", "\\cite{moe2020}", "\\cite[p.~5]{moe2020}")
     assert rules(repo) == [("paper.tex", 7, "quotes/page")]
     edit(repo / "audit.toml", 'version = "abstract"', 'version = "abstract"\npage = "5"')
-    assert ("audit.toml", 31, "quotes/page") in rules(repo)
+    assert ("audit.toml", 33, "quotes/page") in rules(repo)
 
 
 def test_entry_without_page(repo: Path) -> None:  # a transcription without page numbers
     edit(repo / "audit.toml", 'page = "3"\n', "")
-    assert rules(repo) == [("audit.toml", 13, "quotes/no-page")]
+    assert rules(repo) == [("audit.toml", 15, "quotes/no-page")]
 
 
 def test_unverified(repo: Path) -> None:
     edit(repo / "audit.toml", 'status = "verified"', 'status = "unverified"')
-    assert rules(repo) == [("audit.toml", 4, "quotes/unverified")]
+    assert rules(repo) == [("audit.toml", 6, "quotes/unverified")]
 
 
 def test_entry_fields_are_checked(repo: Path) -> None:

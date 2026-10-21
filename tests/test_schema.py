@@ -12,10 +12,13 @@ from pathlib import Path
 import pytest
 
 from osaudit._cli import main
+from osaudit._config import AUDIT as AUDIT_URL
 from osaudit._schema import DOCUMENT, LOG, PREREG, PROVENANCE
 
 INSTRUMENT = "import json; print(json.dumps({'n': 3}))\n"
-AUDIT = """\
+AUDIT = f"""\
+schema = "{AUDIT_URL}"
+
 [paper]
 md = ["*.md"]
 
@@ -91,3 +94,15 @@ def test_wrong_kind_of_schema_is_unknown(repo: Path) -> None:  # boundary: a val
 def test_markdown_without_front_matter_is_not_a_structured_file(repo: Path) -> None:
     (repo / "findings.md").write_text("Plain notes, 0.5.\n")
     assert rules(repo) == []
+
+
+def test_audit_toml_without_schema_cannot_run(
+        repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (repo / "audit.toml").write_text(AUDIT.split("\n", 2)[2])  # drop the schema line
+    assert main(["schema", "--root", str(repo)]) == 2
+    assert "first line must be schema" in capsys.readouterr().err
+
+
+def test_audit_toml_with_another_schema_cannot_run(repo: Path) -> None:
+    (repo / "audit.toml").write_text(AUDIT.replace("audit-v1", "audit-v9"))
+    assert main(["schema", "--root", str(repo)]) == 2

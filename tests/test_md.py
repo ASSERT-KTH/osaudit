@@ -10,9 +10,11 @@ from pathlib import Path
 import pytest
 
 from osaudit._cli import main
+from osaudit._config import AUDIT as AUDIT_URL
 from osaudit._config import ConfigError, load
 from osaudit._md import audited, numbers
 
+HEAD = f'schema = "{AUDIT_URL}"\n'
 FINDINGS = """\
 +++
 task = "exp14"
@@ -76,7 +78,7 @@ def rules(root: Path) -> list[tuple[str, int, str]]:
     return [(f["file"], f["line"], f["rule"]) for f in json.loads(buf.getvalue())]
 
 
-AUDIT = '[paper]\nmd = ["*.md"]\n\n[results]\nfiles = ["results/*.json"]\n'
+AUDIT = HEAD + '[paper]\nmd = ["*.md"]\n\n[results]\nfiles = ["results/*.json"]\n'
 
 
 def test_md_numbers_traced_to_results(tmp_path: Path) -> None:
@@ -89,11 +91,11 @@ def test_md_numbers_traced_to_results(tmp_path: Path) -> None:
 
 
 def test_md_only_paper_is_a_valid_config(tmp_path: Path) -> None:
-    write(tmp_path, '[paper]\nmd = ["*.md"]\n', {"a.md": "+++\nx = 1\n+++\nNo numbers.\n"})
+    write(tmp_path, HEAD + '[paper]\nmd = ["*.md"]\n', {"a.md": "+++\nx = 1\n+++\nNo numbers.\n"})
     assert [p.name for p in load(tmp_path).md] == ["a.md"]
 
 
 def test_broken_front_matter_is_a_config_error(tmp_path: Path) -> None:
-    write(tmp_path, '[paper]\nmd = ["*.md"]\n', {"a.md": "+++\nx = \n+++\nbody\n"})
+    write(tmp_path, HEAD + '[paper]\nmd = ["*.md"]\n', {"a.md": "+++\nx = \n+++\nbody\n"})
     with pytest.raises(ConfigError, match="front matter"):
         load(tmp_path)

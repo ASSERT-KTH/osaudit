@@ -15,6 +15,8 @@ PDF input needs `pdftotext` (poppler-utils).
 In the paper repository, write `audit.toml`:
 
 ```toml
+schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/audit-v1.json"   # mandatory, the first line
+
 [paper]
 tex = ["paper/sections/*.tex"]      # or: pdf = "paper/main.pdf"
 md = ["findings-*.md"]              # Markdown documents with TOML front matter (others skipped)
@@ -126,7 +128,7 @@ A quote is ` ``...'' ` with a citation in the same sentence (the nearest after i
 
 ### Schema URLs
 
-Every structured data file names its schema in a mandatory `schema` key, the URL of a JSON Schema in [assert-research-agent/schemas](https://github.com/ASSERT-KTH/assert-research-agent/tree/main/schemas): the results `provenance` block (`osaudit run` writes it), the front matter of audited Markdown documents, pre-registrations (`[study] prereg/*.md`) and exploration logs (`[study] explore/*.md`). `osaudit schema` reports `schema/missing` and `schema/unknown` (a URL that is not the schema for that kind of file); `run --prereg` refuses a pre-registration without it.
+Every structured data file names its schema in a mandatory `schema` key, the URL of a JSON Schema in [assert-research-agent/schemas](https://github.com/ASSERT-KTH/assert-research-agent/tree/main/schemas): `audit.toml` itself (`audit-v1`; without it the audit cannot run, exit 2), the results `provenance` block (`osaudit run` writes it), the front matter of audited Markdown documents, pre-registrations (`[study] prereg/*.md`) and exploration logs (`[study] explore/*.md`). `osaudit schema` reports `schema/missing` and `schema/unknown` (a URL that is not the schema for that kind of file); `run --prereg` refuses a pre-registration without it.
 
 ## Release
 

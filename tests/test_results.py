@@ -32,6 +32,8 @@ print(json.dumps({"age_ns": now}))
 """
 
 AUDIT = """\
+schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/audit-v1.json"
+
 [paper]
 tex = ["paper.tex"]
 
@@ -164,7 +166,7 @@ def test_depends_scopes_run(repo: Path) -> None:
 
 def test_depends_unused(repo: Path) -> None:  # boundary: an entry for a file that is gone
     (repo / "audit.toml").write_text(AUDIT + DEPENDS.replace("r.json", "gone.json"))
-    assert audit(repo) == [("audit.toml", 8, "results/unused")]
+    assert audit(repo) == [("audit.toml", 10, "results/unused")]
 
 
 def test_input_changed_and_missing(repo: Path) -> None:

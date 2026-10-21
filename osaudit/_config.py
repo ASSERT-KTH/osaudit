@@ -62,9 +62,18 @@ from typing import Any
 from ._frontmatter import front_matter, span
 from ._number import Num, parse
 
+AUDIT = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/audit-v1.json"
+
 
 class ConfigError(Exception):
     pass
+
+
+def _schema(path: Path, data: dict[str, Any]) -> None:
+    """audit.toml names its schema, mandatory: the URL that leads to its specification."""
+    if data.get("schema") != AUDIT:
+        found = "no schema" if "schema" not in data else f"schema {data['schema']!r}"
+        raise ConfigError(f'{path}: {found}; the first line must be schema = "{AUDIT}"')
 
 
 @dataclass(frozen=True)
@@ -230,6 +239,7 @@ def load(root: Path, path: Path | None = None) -> Config:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"{path}: {e}") from e
+    _schema(path, data)
     paper = data.get("paper", {})
     tex = _glob(root, paper["tex"], "paper.tex") if "tex" in paper else ()
     md = _markdown(_glob(root, paper["md"], "paper.md")) if "md" in paper else ()
@@ -280,6 +290,7 @@ def study_context(root: Path) -> tuple[Study, list[Path]]:
             data = tomllib.loads(path.read_text())
         except tomllib.TOMLDecodeError as e:
             raise ConfigError(f"{path}: {e}") from e
+        _schema(path, data)
     study = _study(data.get("study", {}))
     files = data.get("results", {}).get("files")
     if files:
@@ -322,9 +333,11 @@ def instruments(root: Path, output: str) -> list[str] | None:
         return None
     text = path.read_text()
     try:
-        results = tomllib.loads(text).get("results", {})
+        data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"{path}: {e}") from e
+    _schema(path, data)
+    results = data.get("results", {})
     for d in _depends(root, text, results.get("depends", [])):
         if d.file == output:
             return [str(p.relative_to(root)) for p in d.instruments]
