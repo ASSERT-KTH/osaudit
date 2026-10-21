@@ -12,7 +12,7 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from . import __version__, _numbers, _provenance, _quotes, _results_check, _study
+from . import __version__, _numbers, _provenance, _quotes, _results_check, _schema, _study
 from ._config import Config, ConfigError, instruments, load
 from ._findings import Finding
 from ._git import GitError
@@ -37,6 +37,8 @@ CHECKS: dict[str, tuple[Callable[[Config, argparse.Namespace], list[Finding]], s
                           "(static; --inputs, --rerun to go further)"),
     "study": (lambda cfg, _: _study.check(cfg),
               "every confirmatory result pre-registered, unamended after data, on unseen data"),
+    "schema": (lambda cfg, _: _schema.check(cfg),
+               "every structured data file names its schema URL (assert-research-agent)"),
 }
 
 

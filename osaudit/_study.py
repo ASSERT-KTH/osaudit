@@ -29,6 +29,7 @@ from . import _git, _provenance
 from ._config import Config, study_context
 from ._findings import Finding
 from ._frontmatter import front_matter
+from ._schema import PREREG
 
 __all__ = ["check", "front_matter", "precheck", "prereg_problems"]
 
@@ -40,7 +41,7 @@ CORRECTIONS = ("holm", "bonferroni", "hochberg", "benjamini-hochberg", "none")
 
 def prereg_problems(fm: dict[str, Any]) -> list[str]:
     """What makes `fm` not a valid pre-registration front matter; [] when valid."""
-    out = []
+    out = [] if fm.get("schema") == PREREG else [f'schema must be "{PREREG}"']
     if fm.get("mode") != "confirmatory":
         out.append('mode must be "confirmatory"')
     out += [f"{k} must be a non-empty string" for k in TEXT_FIELDS

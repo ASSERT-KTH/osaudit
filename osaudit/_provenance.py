@@ -1,6 +1,7 @@
 """The provenance block of a results file, and `osaudit run`, which writes it.
 
     "provenance": {
+      "schema": "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/provenance-v1.json",
       "command": ["python", "study/survey.py", "data/answers.csv"],
       "cwd": ".",
       "inputs": [{"path": "data/answers.csv", "sha256": "e3b0..."}],
@@ -8,7 +9,7 @@
       "now": "2026-10-19T10:00:00+00:00",
       "mode": "confirmatory",               # optional: confirmatory|exploratory
       "study": "prereg/2026-10-19-x.md",    # with mode: the pre-registration, or the log
-      "osaudit": "0.2.0"
+      "osaudit": "0.4.0"
     }
 
 `now` is the time anchor: the command runs with it in `OSAUDIT_NOW`, and an instrument reads it
@@ -37,6 +38,7 @@ ENV_NOW = "OSAUDIT_NOW"
 HEX64 = re.compile(r"[0-9a-f]{64}")
 HEX40 = re.compile(r"[0-9a-f]{40}")
 MODES = ("confirmatory", "exploratory")
+SCHEMA = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/provenance-v1.json"
 
 
 class RunError(Exception):
@@ -168,6 +170,6 @@ def run(root: Path, cmd: list[str], inputs: list[Path], output: Path,
             raise RunError("refused: " + "; ".join(problems))
     out = execute(cmd, Path.cwd(), now)
     labels = {"mode": mode, "study": study} if mode else {}
-    out[KEY] = {"command": cmd, "cwd": cwd, "inputs": hashed, "commit": commit, "now": now,
-                **labels, "osaudit": __version__}
+    out[KEY] = {"schema": SCHEMA, "command": cmd, "cwd": cwd, "inputs": hashed,
+                "commit": commit, "now": now, **labels, "osaudit": __version__}
     output.write_text(json.dumps(out, indent=1) + "\n")

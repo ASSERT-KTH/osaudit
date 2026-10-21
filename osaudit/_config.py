@@ -234,7 +234,7 @@ def load(root: Path, path: Path | None = None) -> Config:
     tex = _glob(root, paper["tex"], "paper.tex") if "tex" in paper else ()
     md = _markdown(_glob(root, paper["md"], "paper.md")) if "md" in paper else ()
     pdf = None
-    if not tex and ("pdf" in paper or not md):
+    if not tex and ("pdf" in paper or "md" not in paper):
         if "pdf" not in paper:
             raise ConfigError(f"{path}: [paper] declares neither tex, pdf nor md")
         pdf = root / paper["pdf"]

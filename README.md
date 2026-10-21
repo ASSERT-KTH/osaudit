@@ -67,6 +67,7 @@ Then:
     osaudit results --inputs    # ... and its inputs still have their recorded sha256
     osaudit results --rerun     # ... and its command, rerun at its time anchor, prints the same
     osaudit study               # every confirmatory result pre-registered, unamended, on unseen data
+    osaudit schema              # every structured data file names its schema URL
     osaudit CHECK --json        # a JSON array of findings, [] when clean
     osaudit CHECK --root PATH --config FILE
 
@@ -123,13 +124,17 @@ A Markdown document (`[paper] md`, alone or with LaTeX or a PDF) is audited only
 
 A quote is ` ``...'' ` with a citation in the same sentence (the nearest after it, else before it); its page is the `p.~X` of that citation. It must be verbatim, after normalization of LaTeX, typography and case, in the full sentence of an entry for that key; `[...]` marks a cut. In a PDF, citations are numbered, so a quote `“...”` matches any entry by its text.
 
+### Schema URLs
+
+Every structured data file names its schema in a mandatory `schema` key, the URL of a JSON Schema in [assert-research-agent/schemas](https://github.com/ASSERT-KTH/assert-research-agent/tree/main/schemas): the results `provenance` block (`osaudit run` writes it), the front matter of audited Markdown documents, pre-registrations (`[study] prereg/*.md`) and exploration logs (`[study] explore/*.md`). `osaudit schema` reports `schema/missing` and `schema/unknown` (a URL that is not the schema for that kind of file); `run --prereg` refuses a pre-registration without it.
+
 ## Release
 
 Bump `version` in `pyproject.toml` and `osaudit/__init__.py` (a test checks they agree) and push to `main`. The publish workflow tests that commit, publishes it to PyPI, then tags it `v<version>` with a GitHub release. A push whose version is already tagged publishes nothing.
 
 ## Status
 
-`numbers` (LaTeX, PDF, Markdown), `quotes` (LaTeX, PDF), `results`, `study` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md) and not built.
+`numbers` (LaTeX, PDF, Markdown), `quotes` (LaTeX, PDF), `results`, `study`, `schema` and `run` are implemented. References are checked by a separate tool, [check-hallucinations](https://github.com/ASSERT-KTH/check-hallucinations); cross-references and reviews are specified in the [conventions](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md) and not built.
 
 ## License
 

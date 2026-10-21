@@ -28,6 +28,7 @@ print(json.dumps({"rows": len(rows), "share": 0.625}))
 
 PREREG = """\
 +++
+schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/prereg-v1.json"
 mode = "confirmatory"
 hypothesis = "the share is above one half"
 null = "the share is at most one half"
@@ -47,6 +48,7 @@ disaster = "rows = 0"
 
 LOG = """\
 +++
+schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/exploration-log-v1.json"
 mode = "exploratory"
 holdout = ["data/test"]
 data_seen = ["data/train.csv"]
