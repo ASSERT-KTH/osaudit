@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
-from bisect import bisect_left
-from collections.abc import Iterable
+from bisect import bisect_left, bisect_right
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
@@ -51,6 +51,15 @@ def parse(text: str) -> Num | None:
     return make("", 0, text.strip(), m.group(1), m.group(2), m.group(3) is not None)
 
 
+def _half(num: Num) -> Decimal:
+    """Half a unit of the last digit of `num`."""
+    return Decimal(5) * Decimal(10) ** -(num.decimals + 1)
+
+
+def _value(x: tuple[Decimal, str]) -> Decimal:
+    return x[0]
+
+
 def close(num: Num, v: Decimal) -> bool:
     """`num` is `v` printed with its decimals: equal within half a unit of its last digit.
 
@@ -58,7 +67,7 @@ def close(num: Num, v: Decimal) -> bool:
     matches v as a share (100·v), or as a value already in percent when v is not a count (a
     JSON integer): `57.0%` is not the count 57.
     """
-    half = Decimal(5) * Decimal(10) ** -(num.decimals + 1)
+    half = _half(num)
     if num.percent:
         in_percent = v.as_tuple().exponent != 0 and abs(num.value - v) <= half
         return abs(num.value - 100 * v) <= half or in_percent
@@ -67,29 +76,41 @@ def close(num: Num, v: Decimal) -> bool:
     return abs(num.value - v) <= half
 
 
-def _within(xs: list[Decimal], x: Decimal, half: Decimal) -> bool:
-    i = bisect_left(xs, x - half)
-    return i < len(xs) and xs[i] <= x + half
+def _near(xs: list[tuple[Decimal, str]], x: Decimal, half: Decimal) -> list[tuple[Decimal, str]]:
+    return xs[bisect_left(xs, x - half, key=_value):bisect_right(xs, x + half, key=_value)]
+
+
+def _within(xs: list[tuple[Decimal, str]], x: Decimal, half: Decimal) -> bool:
+    i = bisect_left(xs, x - half, key=_value)
+    return i < len(xs) and xs[i][0] <= x + half
 
 
 class Values:
-    """Results values indexed for `close`: `matches(num)` is `any(close(num, v) for v in values)`
-    in logarithmic time."""
+    """Named results values indexed for `close`: `matches(num)` is
+    `any(close(num, v) for v in values.values())` in logarithmic time."""
 
-    def __init__(self, values: Iterable[Decimal]) -> None:
-        vs = list(values)
-        self.plain = sorted(vs)
-        self.ints = {v for v in vs if v == v.to_integral_value()}
-        self.shares = sorted(100 * v for v in vs)
-        self.percents = sorted(v for v in vs if v.as_tuple().exponent != 0)
+    def __init__(self, values: Mapping[str, Decimal]) -> None:
+        self.plain = sorted((v, k) for k, v in values.items())
+        self.shares = sorted((100 * v, k) for k, v in values.items())
+        self.percents = sorted((v, k) for k, v in values.items() if v.as_tuple().exponent != 0)
+
+    def _lists(self, num: Num) -> list[list[tuple[Decimal, str]]]:
+        return [self.shares, self.percents] if num.percent else [self.plain]
 
     def matches(self, num: Num) -> bool:
-        half = Decimal(5) * Decimal(10) ** -(num.decimals + 1)
-        if num.percent:
-            return _within(self.shares, num.value, half) or _within(self.percents, num.value, half)
-        if num.decimals == 0:
-            return num.value in self.ints
-        return _within(self.plain, num.value, half)
+        # A plain integer matches only an equal value: no half unit.
+        half = Decimal(0) if num.decimals == 0 and not num.percent else _half(num)
+        return any(_within(xs, num.value, half) for xs in self._lists(num))
+
+    def names(self, num: Num) -> list[str]:
+        """The names of the values that `num` matches, the closest first."""
+        half = Decimal(0) if num.decimals == 0 and not num.percent else _half(num)
+        near: dict[str, Decimal] = {}
+        for xs in self._lists(num):
+            for x, k in _near(xs, num.value, half):
+                d = abs(x - num.value)
+                near[k] = min(d, near.get(k, d))
+        return sorted(near, key=lambda k: (near[k], k))
 
     def neighbours_matched(self, num: Num) -> int:
         """How many of the NEIGHBOURS numbers printed as `num` is (same decimals, same percent

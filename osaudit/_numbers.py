@@ -21,8 +21,10 @@ from __future__ import annotations
 import ast
 import os
 import re
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Iterator
 from decimal import Decimal
+from itertools import islice
 
 from . import _md, _pdf, _study, _tex
 from ._config import Config
@@ -31,6 +33,7 @@ from ._number import NEIGHBOURS, Num, Values, close
 from ._results import Results
 
 MAX_CANDIDATES = 3
+MAX_EXPRESSIONS = 1000
 # Above this many of its NEIGHBOURS matching a value, a direct match of a number is chance.
 CHANCE = NEIGHBOURS // 2
 
@@ -55,31 +58,50 @@ def _shown(n: Num, v: Decimal) -> str:
     return f"{q:,}" + ("%" if n.percent else "")
 
 
+def _expressions(n: Num, named: list[tuple[str, Decimal]]) -> Iterator[str]:
+    """The single-operation expressions over the counts `named` that print as `n`."""
+    by_value: dict[Decimal, list[str]] = {}
+    for k, v in named:
+        by_value.setdefault(v, []).append(k)
+    if not n.percent and n.decimals == 0:
+        for a, va in named:
+            for b in by_value.get(va - n.value, []):
+                yield f"{a} - {b}"
+            for b in by_value.get(n.value - va, []):
+                if a < b:
+                    yield f"{a} + {b}"
+        return
+    # The shares va / vb that `close` can accept lie within half a unit of n, or of n / 100
+    # for a percent: look up the va of each vb in that range, not every pair.
+    half = Decimal(5) * Decimal(10) ** -(n.decimals + 1)
+    targets = [(n.value, half)] + ([(n.value / 100, half / 100)] if n.percent else [])
+    distinct = sorted(by_value)
+    for vb in distinct:
+        if vb == 0:
+            continue
+        vas: set[Decimal] = set()
+        for t, h in targets:
+            lo, hi = sorted(((t - h) * vb, (t + h) * vb))
+            vas.update(distinct[bisect_left(distinct, lo):bisect_right(distinct, hi)])
+        for va in sorted(vas):
+            if close(n, va / vb):
+                yield from (f"{a} / {b}" for a in by_value[va] for b in by_value[vb] if a != b)
+
+
 def candidates(n: Num, values: dict[str, Decimal]) -> list[str]:
     """Up to MAX_CANDIDATES single-operation expressions over results values that print as `n`.
 
     Operands are counts (JSON integers): a sum or difference of counts, or a share of two counts.
     Expressions within one results file come first, then those whose operands are closest in
     the results tree (`survey.by_age.young.complete / survey.total`), then the shortest.
+    None when more than MAX_EXPRESSIONS print as `n`: the results are too dense to guess from.
     """
     named = sorted((k, v) for k, v in values.items()
                    if not k.endswith(" (key)") and v.as_tuple().exponent == 0)
-    by_value: dict[Decimal, list[str]] = {}
-    for k, v in named:
-        by_value.setdefault(v, []).append(k)
-    out: list[str] = []
-    if not n.percent and n.decimals == 0:
-        for a, va in named:
-            for b in by_value.get(va - n.value, []):
-                out.append(f"{a} - {b}")
-            for b in by_value.get(n.value - va, []):
-                if a < b:
-                    out.append(f"{a} + {b}")
-    else:
-        for a, va in named:
-            for b, vb in named:
-                if a != b and vb != 0 and close(n, va / vb):
-                    out.append(f"{a} / {b}")
+    out = list(islice(_expressions(n, named), MAX_EXPRESSIONS + 1))
+    if len(out) > MAX_EXPRESSIONS:
+        return []
+
     def rank(e: str) -> tuple[int, int, int, str]:
         a, b = (re.split(r"[.\[]", x) for x in e.split(" ", 2)[::2])
         shared = len(os.path.commonprefix([a, b]))
@@ -147,7 +169,7 @@ def exploratory_unlabelled(cfg: Config, results: Results) -> list[Finding]:
 
 def check(cfg: Config) -> list[Finding]:
     results = Results.load(list(cfg.results))
-    values = Values(results.values.values())
+    values = Values(results.values)
     toml = cfg.rel(cfg.path)
     findings: list[Finding] = []
 
@@ -177,10 +199,8 @@ def check(cfg: Config) -> list[Finding]:
             continue
         if values.matches(n):
             if (chance := values.neighbours_matched(n)) > CHANCE:
-                near = sorted((min(abs(n.value - v), abs(n.value - 100 * v)), k)
-                              for k, v in results.values.items()
-                              if not k.endswith(" (key)") and close(n, v))
-                names = [k for _, k in near[:MAX_CANDIDATES]]
+                names = [k for k in values.names(n) if not k.endswith(" (key)")]
+                names = names[:MAX_CANDIDATES]
                 findings.append(Finding(
                     n.file, n.line, "numbers/chance-match",
                     f"{n.text} matches a results value, but so do {chance} of the {NEIGHBOURS} "

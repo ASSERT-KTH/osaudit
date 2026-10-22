@@ -141,7 +141,7 @@ def test_values_index_agrees_with_close() -> None:  # the index against its refe
     rng = random.Random(0)
     vs = [Decimal(str(round(rng.uniform(0, 3), rng.randint(0, 4)))) for _ in range(300)]
     vs += [Decimal(rng.randint(0, 300)) for _ in range(100)]
-    index = Values(vs)
+    index = Values({str(i): v for i, v in enumerate(vs)})
     for d in range(4):
         for pct in (False, True):
             for i in range(0, 400 if d == 0 else 3 * 10 ** d, 1 if d < 2 else 7):
@@ -149,6 +149,7 @@ def test_values_index_agrees_with_close() -> None:  # the index against its refe
                 n = parse(text)
                 assert n is not None
                 assert index.matches(n) == any(close(n, v) for v in vs), text
+                assert set(index.names(n)) == {str(i) for i, v in enumerate(vs) if close(n, v)}
 
 
 def dense(root: Path, paper: str, derive: str = "") -> Path:
@@ -178,8 +179,31 @@ def test_derivation_traces_a_number_in_dense_results(tmp_path: Path) -> None:  #
 
 
 def test_sparse_results_are_not_chance() -> None:  # known-negative
-    index = Values([Decimal("0.42"), Decimal("0.5"), Decimal("7")])
+    index = Values({"a": Decimal("0.42"), "b": Decimal("0.5"), "c": Decimal("7")})
     for text in ("0.42", "42.0%", "7"):
         n = parse(text)
         assert n is not None and index.matches(n)
         assert index.neighbours_matched(n) <= 1
+
+
+def test_share_candidates_agree_with_all_pairs() -> None:  # the range lookup against all pairs
+    rng = random.Random(1)
+    values = {f"r.c{i}": Decimal(rng.randint(-40, 400)) for i in range(60)} | {"r.z": Decimal(0)}
+    named = sorted(values.items())
+    for text in ("0.5", "1.25", "0.0%", "33.3%", "12.50%", "2.0", "0.07"):
+        n = parse(text)
+        assert n is not None
+        every = sorted(f"{a} / {b}" for a, va in named for b, vb in named
+                       if a != b and vb != 0 and close(n, va / vb))
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr("osaudit._numbers.MAX_CANDIDATES", len(named) ** 2)
+            m.setattr("osaudit._numbers.MAX_EXPRESSIONS", len(named) ** 2)
+            assert sorted(candidates(n, values)) == every, text
+
+
+def test_no_candidates_from_dense_counts() -> None:  # too many expressions print as the number
+    n = parse("5")
+    assert n is not None
+    counts = {f"r.c{i}": Decimal(i) for i in range(2000)}
+    assert candidates(n, counts) == []
+    assert candidates(n, {k: counts[k] for k in ("r.c2", "r.c3", "r.c9")}) == ["r.c2 + r.c3"]
