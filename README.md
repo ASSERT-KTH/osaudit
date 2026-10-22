@@ -80,7 +80,7 @@ One line per finding, `file:line: rule: message` (for a PDF, the line is the pag
     paper.tex:2: quotes/mismatch: ``the only memory of a laboratory'' is not verbatim in the entry of doe2001archive (closest: audit.toml:4)
     study/results/survey.json:1: results/no-provenance: no 'provenance' block
     study/ages.py:12: results/wall-clock: datetime.now( reads the clock or a file time; read the time anchor from $OSAUDIT_NOW instead
-    results/passrate.json:9: study/data-reused: input data/test/part.csv has the sha256 of an input of results/look.json, which is not confirmatory
+    results/passrate.json:9: study/data-reused: input data/test/part.csv has the sha256 of an input of results/look.json, which is not confirmatory and ran no later than this run
 
 Exit status: 0 clean, 1 findings, 2 the audit could not run (configuration, input).
 
@@ -104,7 +104,7 @@ A pre-registration and an exploration log are Markdown files with TOML front mat
 - `study/not-preregistered`: its pre-registration is committed at the run's commit, with valid front matter (hypothesis, data, alpha, m, correction, ...);
 - `study/prereg-mismatch`: the command runs a registered experiment, and every input is inside the registered data;
 - `study/amended`: the registration did not change between its first commit and the run without an `[[amendments]]` entry, and no amendment was made after data was seen;
-- `study/data-reused`: no input was seen before, as an input of an exploratory or unlabelled result (same sha256, under any name) or in an exploration log's `data_seen`.
+- `study/data-reused`: no input was seen before the run, as an input of an exploratory or unlabelled result whose run (`now`) is not later (same sha256, under any name), or in the `data_seen` of an exploration log first committed no later than the run. Exploring a confirmed result's data afterwards leaves the confirmation intact, but spends the data: a later `run --prereg` on it is refused.
 
 A results file without a mode is unlabelled: never confirmatory, silent for these rules. When some results are exploratory, a printed number traced only to them (or a derivation with an exploratory operand) must say "exploratory" in its paragraph (in a PDF, its page): `numbers/exploratory-unlabelled`.
 
