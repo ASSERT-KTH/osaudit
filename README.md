@@ -110,7 +110,9 @@ A results file without a mode is unlabelled: never confirmatory, silent for thes
 
 ### Results values
 
-The `provenance` block is not a result and is never matched. A value is named `<file stem>.<key>...`, with `["key"]` for keys that are not identifiers and `[i]` for list indices: `ages.by_age["<30"].share`. A printed number matches a value within half a unit of its last digit; a percent matches 100·v. Expressions allow `+ - * /`, parentheses and numeric constants, and are never evaluated as Python.
+The `provenance` block is not a result and is never matched. A value is named `<file stem>.<key>...`, with `["key"]` for keys that are not identifiers and `[i]` for list indices: `ages.by_age["<30"].share`. A printed number matches a value within half a unit of its last digit; a percent matches 100·v. `NaN` and `Infinity` are not values: nothing matches them, and an expression naming one is `numbers/derive-unknown`.
+
+A match traces a number only if few numbers printed like it match too. Results that hold raw outputs (per-layer curves, per-example scores) hold so many values that any 2- or 3-decimal number in [0, 1] is within half a unit of one. When more than 50 of the 100 nearest numbers with the same decimals (and percent sign) also match a value, the direct match is `numbers/chance-match`: declare the number in `[[numbers.derive]]` with the name of its value (`expr = "raw.scores[420]"`; the closest values are proposed). Better, write results that hold the cited quantities, not the raw outputs. Expressions allow `+ - * /`, parentheses and numeric constants, and are never evaluated as Python.
 
 Candidates proposed for an untraced number are single operations over counts (sums, differences, shares), ranked by closeness in the results tree. They are hints: nothing is accepted until written into `audit.toml`.
 

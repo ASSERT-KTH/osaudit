@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import shutil
 from decimal import Decimal
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 
 from osaudit._cli import main
 from osaudit._config import AUDIT, ConfigError, load
-from osaudit._number import parse
+from osaudit._number import Values, close, parse
 from osaudit._numbers import candidates, check
 from osaudit._results import Results
 
@@ -134,3 +135,51 @@ def test_non_finite_results_value_is_skipped(repo: Path) -> None:  # issue #1
         with pytest.raises(ValueError, match="not a finite number"):
             r.evaluate(expr)
     assert rules(repo) == []
+
+
+def test_values_index_agrees_with_close() -> None:  # the index against its reference
+    rng = random.Random(0)
+    vs = [Decimal(str(round(rng.uniform(0, 3), rng.randint(0, 4)))) for _ in range(300)]
+    vs += [Decimal(rng.randint(0, 300)) for _ in range(100)]
+    index = Values(vs)
+    for d in range(4):
+        for pct in (False, True):
+            for i in range(0, 400 if d == 0 else 3 * 10 ** d, 1 if d < 2 else 7):
+                text = f"{i / 10 ** d:.{d}f}" + ("%" if pct else "")
+                n = parse(text)
+                assert n is not None
+                assert index.matches(n) == any(close(n, v) for v in vs), text
+
+
+def dense(root: Path, paper: str, derive: str = "") -> Path:
+    """A paper over raw outputs: a per-example score for every 3-decimal value in [0, 1]."""
+    (root / "results").mkdir()
+    (root / "results" / "raw.json").write_text(json.dumps(
+        {"scores": [i / 1000 for i in range(1001)], "n": 7}))
+    (root / "paper.tex").write_text(paper)
+    (root / "audit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['paper.tex']\n"
+                                     f"[results]\nfiles = ['results/*.json']\n{derive}")
+    return root
+
+
+def test_dense_results_match_by_chance(tmp_path: Path) -> None:  # issue #2, known-positive
+    root = dense(tmp_path, "The mean is 0.42, then 0.01 or 4.2\\%, of 7 runs.\n")
+    found = {f.message.split(" ")[0]: f for f in check(load(root))}
+    assert sorted(found) == ["0.01", "0.42", "4.2\\%"]  # 7 is one of 2 integer values: traced
+    assert {f.rule for f in found.values()} == {"numbers/chance-match"}
+    assert found["0.42"].candidates[0] == "raw.scores[420]"  # the closest value first
+    assert "100 of the 100" in found["0.42"].message
+
+
+def test_derivation_traces_a_number_in_dense_results(tmp_path: Path) -> None:  # boundary
+    root = dense(tmp_path, "The mean is 0.42.\n",
+                 '[[numbers.derive]]\nvalue = "0.42"\nexpr = "raw.scores[420]"\n')
+    assert rules(root) == []
+
+
+def test_sparse_results_are_not_chance() -> None:  # known-negative
+    index = Values([Decimal("0.42"), Decimal("0.5"), Decimal("7")])
+    for text in ("0.42", "42.0%", "7"):
+        n = parse(text)
+        assert n is not None and index.matches(n)
+        assert index.neighbours_matched(n) <= 1

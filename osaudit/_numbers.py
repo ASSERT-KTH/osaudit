@@ -3,7 +3,11 @@
 Rules:
   numbers/untraced         a printed number matches no results value, derivation or allow entry
   numbers/derive-mismatch  a derivation evaluates to another value than the one it declares
-  numbers/derive-unknown   a derivation names a results value that does not exist
+  numbers/derive-unknown   a derivation names a results value that does not exist, or NaN/Infinity
+  numbers/chance-match     a printed number matches a results value only directly, but the
+                           results are so dense that most numbers printed like it match too
+                           (more than CHANCE of its NEIGHBOURS): the match traces nothing, a
+                           derivation naming the value does
   numbers/unused           a derivation or allow entry matches no number of the paper
   numbers/exploratory-unlabelled
                            a number traced to exploratory results (provenance mode, see
@@ -23,10 +27,12 @@ from decimal import Decimal
 from . import _md, _pdf, _study, _tex
 from ._config import Config
 from ._findings import Finding
-from ._number import Num, close
+from ._number import NEIGHBOURS, Num, Values, close
 from ._results import Results
 
 MAX_CANDIDATES = 3
+# Above this many of its NEIGHBOURS matching a value, a direct match of a number is chance.
+CHANCE = NEIGHBOURS // 2
 
 
 def paper_numbers(cfg: Config) -> Iterator[Num]:
@@ -141,7 +147,7 @@ def exploratory_unlabelled(cfg: Config, results: Results) -> list[Finding]:
 
 def check(cfg: Config) -> list[Finding]:
     results = Results.load(list(cfg.results))
-    values = list(results.values.values())
+    values = Values(results.values.values())
     toml = cfg.rel(cfg.path)
     findings: list[Finding] = []
 
@@ -167,7 +173,20 @@ def check(cfg: Config) -> list[Finding]:
     for n in paper_numbers(cfg):
         hits = [i for i, e in enumerate(cfg.entries) if e.covers(n)]
         used.update(hits)
-        if hits or any(close(n, v) for v in values):
+        if hits:
+            continue
+        if values.matches(n):
+            if (chance := values.neighbours_matched(n)) > CHANCE:
+                near = sorted((min(abs(n.value - v), abs(n.value - 100 * v)), k)
+                              for k, v in results.values.items()
+                              if not k.endswith(" (key)") and close(n, v))
+                names = [k for _, k in near[:MAX_CANDIDATES]]
+                findings.append(Finding(
+                    n.file, n.line, "numbers/chance-match",
+                    f"{n.text} matches a results value, but so do {chance} of the {NEIGHBOURS} "
+                    "numbers printed like it nearest to it: name its value in a "
+                    "[[numbers.derive]]" + (", expr: " + " | ".join(names) if names else ""),
+                    tuple(names)))
             continue
         cands = candidates(n, results.values)
         msg = f"{n.text} matches no results value, derivation or allow entry"
