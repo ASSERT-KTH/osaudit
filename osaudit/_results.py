@@ -3,6 +3,8 @@
 A value is named `<file stem>.<key>...`, with `["key"]` for a key that is not an identifier and
 `[i]` for a list index: `survey.responses`, `survey.by_age["<30"].share`. A numeric dict key is
 a value too (`survey.share_by_threshold["50"]`), since parameters of a run are often keys.
+A non-finite number (`NaN`, `Infinity`, as `json.dump` writes them) is not a value: no printed
+number matches it, and an expression naming it is an error.
 Expressions over these names (`a - b`, `(a + b) / c`) are parsed by `ast`, never evaluated.
 """
 
@@ -10,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import json
+import math
 from decimal import Decimal, DivisionByZero, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -45,7 +48,7 @@ def flatten(name: str, x: Any, out: dict[str, Decimal]) -> None:
             flatten(_name(name, i), v, out)
     elif isinstance(x, bool):
         pass
-    elif isinstance(x, int | float):
+    elif isinstance(x, int | float) and math.isfinite(x):
         out[name] = Decimal(str(x))
 
 
@@ -121,4 +124,6 @@ class Results:
                 raise ValueError(f"unknown results value: {ast.unparse(node)}") from None
         if isinstance(x, bool) or not isinstance(x, int | float):
             raise ValueError(f"not a number: {ast.unparse(node)}")
+        if not math.isfinite(x):
+            raise ValueError(f"not a finite number: {ast.unparse(node)} = {x}")
         return Decimal(str(x))

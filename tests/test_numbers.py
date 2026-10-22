@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -123,3 +124,13 @@ def test_candidates_use_counts_only() -> None:
 def test_provenance_is_not_a_result() -> None:
     r = Results.load([FIXTURES / "clean" / "results" / "panel.json"])
     assert not any("provenance" in k for k in r.values)
+
+
+def test_non_finite_results_value_is_skipped(repo: Path) -> None:  # issue #1
+    (repo / "results" / "nan.json").write_text('{"acc": NaN, "inf": Infinity, "x": 0.42}')
+    r = Results.load([repo / "results" / "nan.json"])
+    assert r.values == {"nan.x": Decimal("0.42")}
+    for expr in ("nan.acc", "nan.inf + 1"):
+        with pytest.raises(ValueError, match="not a finite number"):
+            r.evaluate(expr)
+    assert rules(repo) == []
