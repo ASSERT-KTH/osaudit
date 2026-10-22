@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -69,14 +70,18 @@ instruments = ["experiments/*.py"]
 """
 
 
-def git(root: Path, *args: str) -> None:
+COMMIT_DATE = "2026-03-01T00:00:00+00:00"  # before the runs' anchored now (OSAUDIT_NOW, 2026-03-02)
+
+
+def git(root: Path, *args: str, date: str = COMMIT_DATE) -> None:
+    env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
     subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t",
-                    *args], check=True, capture_output=True)
+                    *args], check=True, capture_output=True, env=env)
 
 
-def commit(root: Path) -> None:
-    git(root, "add", "-A")
-    git(root, "commit", "-q", "-m", "x")
+def commit(root: Path, date: str = COMMIT_DATE) -> None:
+    git(root, "add", "-A", date=date)
+    git(root, "commit", "-q", "-m", "x", date=date)
 
 
 @pytest.fixture
@@ -297,3 +302,31 @@ def test_no_exploratory_results_no_rule(repo: Path) -> None:  # backward compati
     assert run() == 0
     commit(repo)
     assert paper(repo, "It has 3 rows.\n") == []
+
+
+def test_exploration_after_the_confirmatory_run_is_not_reuse(
+        repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Looking at a confirmatory result's data afterwards (a confound check) leaves it intact."""
+    confirmed(repo)  # now 2026-03-02
+    monkeypatch.setenv("OSAUDIT_NOW", "2026-03-05T00:00:00+00:00")
+    assert run("--explore", "explore/look.md", out="results/after.json") == 0  # the same data/test
+    commit(repo, date="2026-03-05T00:00:00+00:00")
+    assert audit(repo) == []
+
+
+def test_log_committed_after_the_confirmatory_run_is_not_reuse(repo: Path) -> None:
+    confirmed(repo)
+    (repo / "explore/later.md").write_text(LOG.replace('"data/train.csv"', '"data/test"'))
+    commit(repo, date="2026-03-05T00:00:00+00:00")
+    assert audit(repo) == []
+
+
+def test_data_explored_after_a_confirmation_is_spent_for_a_new_one(
+        repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    confirmed(repo)
+    monkeypatch.setenv("OSAUDIT_NOW", "2026-03-05T00:00:00+00:00")
+    assert run("--explore", "explore/look.md", out="results/after.json") == 0
+    commit(repo, date="2026-03-05T00:00:00+00:00")
+    monkeypatch.setenv("OSAUDIT_NOW", "2026-03-06T00:00:00+00:00")
+    assert run("--prereg", "prereg/count.md", out="results/again.json") == 2
+    refused(capsys, "study/data-reused")

@@ -51,6 +51,11 @@ def first_commit(root: Path, path: str) -> str | None:
     return out[-1] if out else None
 
 
+def commit_time(root: Path, commit: str) -> str:
+    """The committer date of `commit`, ISO 8601 with its time zone."""
+    return _git(root, "show", "-s", "--format=%cI", commit).strip()
+
+
 def tracked(root: Path, path: str) -> bool:
     return bool(_git(root, "ls-files", "--", path).strip())
 

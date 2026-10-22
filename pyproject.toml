@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "osaudit"
-version = "0.6.1"
+version = "0.6.2"
 description = "Automated open-science audit: trace every claim of a paper to its evidence"
 readme = "README.md"
 license = "MIT"

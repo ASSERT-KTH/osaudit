@@ -12,8 +12,12 @@ Rules, for every confirmatory results file:
                            the registered data
   study/amended            the pre-registration changed between its first commit and the run
                            without an [[amendments]] entry, or was amended after data was seen
-  study/data-reused        an input was seen before: same sha256 as an input of a
-                           non-confirmatory result, or overlapping a log's data_seen path
+  study/data-reused        an input was seen before the run: same sha256 as an input of a
+                           non-confirmatory result whose run (`now`) is not later than this
+                           one's, or overlapping the data_seen path of a log first committed
+                           no later than this run. Exploring a confirmatory result's data
+                           afterwards does not undo the confirmation (the data is then spent
+                           for any later registration, which this same rule refuses).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ import json
 import posixpath
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -85,10 +90,19 @@ def overlaps(a: str, b: str) -> bool:
 
 @dataclass
 class Seen:
-    """Data already looked at: input hashes and paths, each with who saw it."""
+    """Data looked at outside a confirmatory run: input hashes and paths, each with who saw it and
+    when (the run's `now`, or a log's first commit time, as ISO 8601)."""
 
-    hashes: dict[str, str] = field(default_factory=dict)
-    paths: list[tuple[str, str]] = field(default_factory=list)
+    hashes: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    paths: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+def _not_after(when: str, now: str) -> bool:
+    """`when` is at or before `now` (ISO 8601 with a time zone); unparsable counts as before."""
+    try:
+        return datetime.fromisoformat(when) <= datetime.fromisoformat(now)
+    except ValueError:
+        return True
 
 
 def seen(root: Path, results: list[tuple[str, _provenance.Provenance]],
@@ -99,8 +113,8 @@ def seen(root: Path, results: list[tuple[str, _provenance.Provenance]],
         if prov.mode == "confirmatory":
             continue
         for i in prov.inputs:
-            out.hashes.setdefault(i["sha256"], name)
-            out.paths.append((i["path"], name))
+            out.hashes.setdefault(i["sha256"], []).append((name, prov.now))
+            out.paths.append((i["path"], name, prov.now))
         if prov.study:
             logs.add(prov.study)
     for log in sorted(logs):
@@ -109,7 +123,10 @@ def seen(root: Path, results: list[tuple[str, _provenance.Provenance]],
         except OSError:
             continue
         if fm and fm.get("mode") == "exploratory" and isinstance(fm.get("data_seen"), list):
-            out.paths += [(p, log) for p in fm["data_seen"] if isinstance(p, str)]
+            first = _git.first_commit(root, log)
+            # An uncommitted log is being written now: its data counts as seen before any run.
+            when = _git.commit_time(root, first) if first else "0001-01-01T00:00:00+00:00"
+            out.paths += [(p, log, when) for p in fm["data_seen"] if isinstance(p, str)]
     return out
 
 
@@ -153,15 +170,19 @@ def confirmatory(root: Path, prov: _provenance.Provenance,
                         f"{prov.study} was amended on {a['date']} after data was seen: "
                         "the result is exploratory"))
     for i in prov.inputs:
-        if i["sha256"] in data_seen.hashes:
+        earlier = [who for who, when in data_seen.hashes.get(i["sha256"], [])
+                   if _not_after(when, prov.now)]
+        if earlier:
             out.append(("study/data-reused",
-                        f"input {i['path']} has the sha256 of an input of "
-                        f"{data_seen.hashes[i['sha256']]}, which is not confirmatory"))
+                        f"input {i['path']} has the sha256 of an input of {earlier[0]}, which is "
+                        "not confirmatory and ran no later than this run"))
             continue
-        hit = next(((p, who) for p, who in data_seen.paths if overlaps(i["path"], p)), None)
+        hit = next(((p, who) for p, who, when in data_seen.paths
+                    if overlaps(i["path"], p) and _not_after(when, prov.now)), None)
         if hit:
             out.append(("study/data-reused",
-                        f"input {i['path']} overlaps {hit[0]}, seen by {hit[1]}"))
+                        f"input {i['path']} overlaps {hit[0]}, "
+                        f"seen by {hit[1]} no later than this run"))
     return out
 
 
