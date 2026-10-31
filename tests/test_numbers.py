@@ -50,15 +50,15 @@ def test_stale_share_derivation_mismatch(capsys: pytest.CaptureFixture[str]) -> 
     assert main(["numbers", "--root", str(FIXTURES / "stale-age")]) == 1
     out = capsys.readouterr().out.splitlines()
     assert len(out) == 1
-    assert out[0].startswith("audit.toml:10: numbers/derive-mismatch: 70.0% declared")
+    assert out[0].startswith("osaudit.toml:10: numbers/derive-mismatch: 70.0% declared")
     assert out[0].endswith("printed 62.5%")
 
 
 def test_derived_number_without_derivation(repo: Path) -> None:
-    edit(repo / "audit.toml", 'value = "392"', 'value = "391"')
+    edit(repo / "osaudit.toml", 'value = "392"', 'value = "391"')
     findings = check(load(repo))
     assert [(f.file, f.rule) for f in findings] == [
-        ("audit.toml", "numbers/derive-mismatch"),
+        ("osaudit.toml", "numbers/derive-mismatch"),
         ("paper/results.tex", "numbers/untraced"),
     ]
     untraced = findings[1]
@@ -67,7 +67,7 @@ def test_derived_number_without_derivation(repo: Path) -> None:
 
 
 def test_cited_count_without_allow(repo: Path) -> None:  # a count published by a source
-    toml = repo / "audit.toml"
+    toml = repo / "osaudit.toml"
     text = toml.read_text()
     toml.write_text(text[: text.index("[[numbers.allow]]")])
     assert rules(repo) == [("paper/results.tex", 11, "numbers/untraced")]
@@ -75,31 +75,31 @@ def test_cited_count_without_allow(repo: Path) -> None:  # a count published by 
 
 def test_unused_entry(repo: Path) -> None:  # an allow entry that outlived its text
     edit(repo / "paper/results.tex", "2,000,000", "two million")
-    assert rules(repo) == [("audit.toml", 21, "numbers/unused")]
+    assert rules(repo) == [("osaudit.toml", 21, "numbers/unused")]
 
 
 def test_allow_restricted_to_file(repo: Path) -> None:  # boundary: right value, other file
-    toml = repo / "audit.toml"
+    toml = repo / "osaudit.toml"
     toml.write_text(toml.read_text() + 'file = "paper/other.tex"\n')
-    assert sorted(rules(repo)) == [("audit.toml", 21, "numbers/unused"),
+    assert sorted(rules(repo)) == [("osaudit.toml", 21, "numbers/unused"),
                                    ("paper/results.tex", 11, "numbers/untraced")]
 
 
 def test_unknown_value_in_expr(repo: Path) -> None:
-    edit(repo / "audit.toml", "panel.overall.total - ", "panel.overall.totl - ")
+    edit(repo / "osaudit.toml", "panel.overall.total - ", "panel.overall.totl - ")
     findings = check(load(repo))
     assert [(f.line, f.rule) for f in findings] == [(9, "numbers/derive-unknown")]
     assert "panel.overall.totl" in findings[0].message
 
 
 def test_allow_needs_reason(repo: Path) -> None:
-    edit(repo / "audit.toml", 'reason = "population size', 'note = "')
+    edit(repo / "osaudit.toml", 'reason = "population size', 'note = "')
     with pytest.raises(ConfigError, match="reason is mandatory"):
         load(repo)
 
 
 def test_bad_config_exits_2(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (repo / "audit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['nothing/*.tex']\n")
+    (repo / "osaudit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['nothing/*.tex']\n")
     assert main(["numbers", "--root", str(repo)]) == 2
     assert "matches no file" in capsys.readouterr().err
 
@@ -158,7 +158,7 @@ def dense(root: Path, paper: str, derive: str = "") -> Path:
     (root / "results" / "raw.json").write_text(json.dumps(
         {"scores": [i / 1000 for i in range(1001)], "n": 7}))
     (root / "paper.tex").write_text(paper)
-    (root / "audit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['paper.tex']\n"
+    (root / "osaudit.toml").write_text(f"schema = '{AUDIT}'\n[paper]\ntex = ['paper.tex']\n"
                                      f"[results]\nfiles = ['results/*.json']\n{derive}")
     return root
 

@@ -4,5 +4,5 @@ The conventions that `osaudit` checks, and the interfaces it shares with the res
 [CONVENTIONS.md of assert-research-agent](https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md).
 
 They live there because the research agent works earlier in the process: it writes the pre-registrations, exploration logs and results that `osaudit` audits afterwards.
-That document covers the repository layout (`audit.toml`, `[study]`), the study (pre-registration and exploration-log formats, confirmatory and exploratory runs), results provenance, numbers, quotes, references and reviews.
+That document covers the repository layout (`osaudit.toml`, `[study]`), the study (pre-registration and exploration-log formats, confirmatory and exploratory runs), results provenance, numbers, quotes, references and reviews.
 Rule ids printed by `osaudit` (`study/…`, `numbers/…`, `results/…`, `quotes/…`) are the ones used there.

@@ -44,7 +44,7 @@ def make(file: str, line: int, text: str, integer: str, frac: str | None, percen
 
 
 def parse(text: str) -> Num | None:
-    """Parse a value written in `audit.toml` (`"1,204"`, `"80.3%"`, `"80.3\\%"`)."""
+    """Parse a value written in `osaudit.toml` (`"1,204"`, `"80.3%"`, `"80.3\\%"`)."""
     m = PRINTED.fullmatch(text)
     if not m:
         return None

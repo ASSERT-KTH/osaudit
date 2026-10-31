@@ -65,7 +65,7 @@ def test_dates_masked_and_percent_ranges_shared() -> None:
 
 
 def write(root: Path, audit: str, files: dict[str, str]) -> None:
-    (root / "audit.toml").write_text(audit)
+    (root / "osaudit.toml").write_text(audit)
     for name, text in files.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text)

@@ -58,7 +58,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "inst.py").write_text(INSTRUMENT)
     (tmp_path / "data.txt").write_text("a\nb\nc\n")
     (tmp_path / "paper.tex").write_text("No numbers.\n")
-    (tmp_path / "audit.toml").write_text(AUDIT)
+    (tmp_path / "osaudit.toml").write_text(AUDIT)
     (tmp_path / "results").mkdir()
     git(tmp_path, "init", "-q")
     commit(tmp_path)
@@ -150,14 +150,14 @@ def test_depends_scopes_staleness(repo: Path) -> None:
     (repo / "other.py").write_text("print('{}')\n")
     commit(repo)
     assert [r for _, _, r in audit(repo)] == ["results/stale"]  # every instrument by default
-    (repo / "audit.toml").write_text(AUDIT + DEPENDS)
+    (repo / "osaudit.toml").write_text(AUDIT + DEPENDS)
     assert audit(repo) == []                                    # known-negative: not its own
     (repo / "inst.py").write_text(INSTRUMENT + "# changed\n")
     assert [r for _, _, r in audit(repo)] == ["results/stale"]  # known-positive: its own
 
 
 def test_depends_scopes_run(repo: Path) -> None:
-    (repo / "audit.toml").write_text(AUDIT + DEPENDS)
+    (repo / "osaudit.toml").write_text(AUDIT + DEPENDS)
     (repo / "other.py").write_text("print('{}')\n")
     commit(repo)
     (repo / "other.py").write_text("print('{\"x\": 1}')\n")  # dirty, but not an instrument of r
@@ -165,8 +165,8 @@ def test_depends_scopes_run(repo: Path) -> None:
 
 
 def test_depends_unused(repo: Path) -> None:  # boundary: an entry for a file that is gone
-    (repo / "audit.toml").write_text(AUDIT + DEPENDS.replace("r.json", "gone.json"))
-    assert audit(repo) == [("audit.toml", 10, "results/unused")]
+    (repo / "osaudit.toml").write_text(AUDIT + DEPENDS.replace("r.json", "gone.json"))
+    assert audit(repo) == [("osaudit.toml", 10, "results/unused")]
 
 
 def test_input_changed_and_missing(repo: Path) -> None:
@@ -218,7 +218,7 @@ def test_wall_clock(repo: Path, line: str, rules: list[str]) -> None:
 
 def test_manual_results(repo: Path) -> None:
     (repo / "results/review.json").write_text('{"verdicts_checked": 20, "owner_agrees": 20}\n')
-    toml = repo / "audit.toml"
+    toml = repo / "osaudit.toml"
     toml.write_text(AUDIT + '\n[[results.manual]]\nfile = "results/review.json"\nby = "M"\n'
                     'date = "2026-10-17"\nreason = "the author checked 20 labels"\n')
     assert audit(repo) == []
@@ -227,7 +227,7 @@ def test_manual_results(repo: Path) -> None:
 
 
 def test_manual_needs_reason(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (repo / "audit.toml").write_text(AUDIT + '\n[[results.manual]]\nfile = "results/r.json"\n')
+    (repo / "osaudit.toml").write_text(AUDIT + '\n[[results.manual]]\nfile = "results/r.json"\n')
     assert main(["results", "--root", str(repo)]) == 2
     assert "by, date, reason mandatory" in capsys.readouterr().err
 
@@ -244,7 +244,7 @@ def test_directory_hash(tmp_path: Path) -> None:
 
 def test_not_a_repository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (tmp_path / "paper.tex").write_text("x\n")
-    (tmp_path / "audit.toml").write_text(AUDIT)
+    (tmp_path / "osaudit.toml").write_text(AUDIT)
     (tmp_path / "results").mkdir()
     (tmp_path / "inst.py").write_text("")
     (tmp_path / "results/r.json").write_text(json.dumps({"provenance": {

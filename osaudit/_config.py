@@ -1,4 +1,5 @@
-"""`audit.toml`: where the paper, the results and the instruments are, and how they are audited.
+"""`osaudit.toml` (legacy name `audit.toml`): where the paper, the results and the instruments
+are, and how they are audited.
 
     [paper]
     tex = ["paper/sections/*.tex"]     # LaTeX sources, audited when present
@@ -69,8 +70,18 @@ class ConfigError(Exception):
     pass
 
 
+NAME = "osaudit.toml"
+LEGACY_NAME = "audit.toml"
+
+
+def config_path(root: Path) -> Path:
+    """`<root>/osaudit.toml`; the legacy `<root>/audit.toml` when only that one exists."""
+    legacy = root / LEGACY_NAME
+    return legacy if legacy.is_file() and not (root / NAME).is_file() else root / NAME
+
+
 def _schema(path: Path, data: dict[str, Any]) -> None:
-    """audit.toml names its schema, mandatory: the URL that leads to its specification."""
+    """osaudit.toml names its schema, mandatory: the URL that leads to its specification."""
     if data.get("schema") != AUDIT:
         found = "no schema" if "schema" not in data else f"schema {data['schema']!r}"
         raise ConfigError(f'{path}: {found}; the first line must be schema = "{AUDIT}"')
@@ -78,7 +89,7 @@ def _schema(path: Path, data: dict[str, Any]) -> None:
 
 @dataclass(frozen=True)
 class Entry:
-    """A `[[numbers.derive]]` or `[[numbers.allow]]` entry; `line` is its header in audit.toml."""
+    """A `[[numbers.derive]]` or `[[numbers.allow]]` entry; `line` is its header in osaudit.toml."""
 
     kind: str
     num: Num
@@ -208,7 +219,7 @@ def _header_lines(text: str, table: str) -> list[int]:
     return [text.count("\n", 0, m.start()) + 1 for m in pat.finditer(text)]
 
 
-def _entries(text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
+def _entries(path: Path, text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
     raw = numbers.get(kind, [])
     if not isinstance(raw, list):
         raise ConfigError(f"numbers.{kind} must be an array of tables ([[numbers.{kind}]])")
@@ -216,7 +227,7 @@ def _entries(text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
     out = []
     for i, e in enumerate(raw):
         line = lines[i] if i < len(lines) else 0
-        where = f"audit.toml:{line}: numbers.{kind}"
+        where = f"{path.name}:{line}: numbers.{kind}"
         value = e.get("value")
         num = parse(value) if isinstance(value, str) else None
         if num is None:
@@ -231,9 +242,9 @@ def _entries(text: str, numbers: dict[str, Any], kind: str) -> list[Entry]:
 
 
 def load(root: Path, path: Path | None = None) -> Config:
-    path = path or root / "audit.toml"
+    path = path or config_path(root)
     if not path.is_file():
-        raise ConfigError(f"{path}: no audit.toml (see https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md)")
+        raise ConfigError(f"{path}: no {NAME} (see https://github.com/ASSERT-KTH/assert-research-agent/blob/main/CONVENTIONS.md)")
     text = path.read_text()
     try:
         data = tomllib.loads(text)
@@ -253,13 +264,13 @@ def load(root: Path, path: Path | None = None) -> Config:
     res = data.get("results", {})
     results = _glob(root, res["files"], "results.files") if "files" in res else ()
     numbers = data.get("numbers", {})
-    entries = _entries(text, numbers, "derive") + _entries(text, numbers, "allow")
+    entries = _entries(path, text, numbers, "derive") + _entries(path, text, numbers, "allow")
     instruments = res.get("instruments", [])
     return Config(root, path, tex, pdf, results, tuple(entries),
                   _glob(root, instruments, "results.instruments") if instruments else (),
-                  tuple(_manual(text, res.get("manual", []))),
-                  tuple(_depends(root, text, res.get("depends", []))),
-                  tuple(_quotes(text, data.get("quotes", []))),
+                  tuple(_manual(path, text, res.get("manual", []))),
+                  tuple(_depends(path, root, text, res.get("depends", []))),
+                  tuple(_quotes(path, text, data.get("quotes", []))),
                   _study(data.get("study", {})), md)
 
 
@@ -283,7 +294,7 @@ def study_context(root: Path) -> tuple[Study, list[Path]]:
     The results files are `[results] files` when declared, else every JSON file under
     `[study] results`.
     """
-    path = root / "audit.toml"
+    path = config_path(root)
     data: dict[str, Any] = {}
     if path.is_file():
         try:
@@ -299,14 +310,14 @@ def study_context(root: Path) -> tuple[Study, list[Path]]:
     return study, sorted((root / study.results).rglob("*.json"))
 
 
-def _quotes(text: str, raw: Any) -> list[Quote]:
+def _quotes(path: Path, text: str, raw: Any) -> list[Quote]:
     if not isinstance(raw, list):
         raise ConfigError("quotes must be an array of tables ([[quotes]])")
     lines = _header_lines(text, "quotes")
     out = []
     for i, e in enumerate(raw):
         line = lines[i] if i < len(lines) else 0
-        where = f"audit.toml:{line}: quotes"
+        where = f"{path.name}:{line}: quotes"
         missing = [k for k in ("key", "text", "version", "url", "date", "status")
                    if not str(e.get(k, "")).strip()]
         if missing:
@@ -323,12 +334,12 @@ def _quotes(text: str, raw: Any) -> list[Quote]:
 
 
 def instruments(root: Path, output: str) -> list[str] | None:
-    """The instruments `output` depends on, per `<root>/audit.toml`, relative to root; None if
+    """The instruments `output` depends on, per `<root>/osaudit.toml`, relative to root; None if
     undeclared.
 
     For `osaudit run`, which may create the first results file, so `load` would refuse.
     """
-    path = root / "audit.toml"
+    path = config_path(root)
     if not path.is_file():
         return None
     text = path.read_text()
@@ -338,7 +349,7 @@ def instruments(root: Path, output: str) -> list[str] | None:
         raise ConfigError(f"{path}: {e}") from e
     _schema(path, data)
     results = data.get("results", {})
-    for d in _depends(root, text, results.get("depends", [])):
+    for d in _depends(path, root, text, results.get("depends", [])):
         if d.file == output:
             return [str(p.relative_to(root)) for p in d.instruments]
     if not results.get("instruments"):
@@ -347,7 +358,7 @@ def instruments(root: Path, output: str) -> list[str] | None:
             for p in _glob(root, results["instruments"], "results.instruments")]
 
 
-def _depends(root: Path, text: str, raw: Any) -> list[Depends]:
+def _depends(path: Path, root: Path, text: str, raw: Any) -> list[Depends]:
     if not isinstance(raw, list):
         raise ConfigError("results.depends must be an array of tables ([[results.depends]])")
     lines = _header_lines(text, "results.depends")
@@ -355,12 +366,12 @@ def _depends(root: Path, text: str, raw: Any) -> list[Depends]:
     for i, e in enumerate(raw):
         line = lines[i] if i < len(lines) else 0
         if not isinstance(e.get("file"), str) or "instruments" not in e:
-            raise ConfigError(f"audit.toml:{line}: results.depends: file, instruments mandatory")
+            raise ConfigError(f"{path.name}:{line}: results.depends: file, instruments mandatory")
         out.append(Depends(e["file"], _glob(root, e["instruments"], "results.depends"), line))
     return out
 
 
-def _manual(text: str, raw: Any) -> list[Manual]:
+def _manual(path: Path, text: str, raw: Any) -> list[Manual]:
     if not isinstance(raw, list):
         raise ConfigError("results.manual must be an array of tables ([[results.manual]])")
     lines = _header_lines(text, "results.manual")
@@ -369,6 +380,6 @@ def _manual(text: str, raw: Any) -> list[Manual]:
         line = lines[i] if i < len(lines) else 0
         missing = [k for k in ("file", "by", "date", "reason") if not str(e.get(k, "")).strip()]
         if missing:
-            raise ConfigError(f"audit.toml:{line}: results.manual: {', '.join(missing)} mandatory")
+            raise ConfigError(f"{path.name}:{line}: results.manual: {', '.join(missing)} mandatory")
         out.append(Manual(e["file"], e["by"], str(e["date"]), e["reason"], line))
     return out

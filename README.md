@@ -12,7 +12,7 @@ PDF input needs `pdftotext` (poppler-utils).
 
 ## Usage
 
-In the paper repository, write `audit.toml`:
+In the paper repository, write `osaudit.toml` (the former name `audit.toml` is still read when no `osaudit.toml` exists):
 
 ```toml
 schema = "https://github.com/ASSERT-KTH/assert-research-agent/blob/main/schemas/audit-v1.json"   # mandatory, the first line
@@ -76,8 +76,8 @@ Then:
 One line per finding, `file:line: rule: message` (for a PDF, the line is the page):
 
     paper/results.tex:6: numbers/untraced: 392 matches no results value, derivation or allow entry; candidate expr: panel.overall.total - panel.overall.answers.yes | survey.complete - panel.overall.answers.yes
-    audit.toml:8: numbers/derive-mismatch: 70.0% declared, but ages.by_age["<30"].holds / ages.by_age["<30"].informative = 0.625, printed 62.5%
-    paper.tex:2: quotes/mismatch: ``the only memory of a laboratory'' is not verbatim in the entry of doe2001archive (closest: audit.toml:4)
+    osaudit.toml:8: numbers/derive-mismatch: 70.0% declared, but ages.by_age["<30"].holds / ages.by_age["<30"].informative = 0.625, printed 62.5%
+    paper.tex:2: quotes/mismatch: ``the only memory of a laboratory'' is not verbatim in the entry of doe2001archive (closest: osaudit.toml:4)
     study/results/survey.json:1: results/no-provenance: no 'provenance' block
     study/ages.py:12: results/wall-clock: datetime.now( reads the clock or a file time; read the time anchor from $OSAUDIT_NOW instead
     results/passrate.json:9: study/data-reused: input data/test/part.csv has the sha256 of an input of results/look.json, which is not confirmatory and ran no later than this run
@@ -114,7 +114,7 @@ The `provenance` block is not a result and is never matched. A value is named `<
 
 A match traces a number only if few numbers printed like it match too. Results that hold raw outputs (per-layer curves, per-example scores) hold so many values that any 2- or 3-decimal number in [0, 1] is within half a unit of one. When more than 50 of the 100 nearest numbers with the same decimals (and percent sign) also match a value, the direct match is `numbers/chance-match`: declare the number in `[[numbers.derive]]` with the name of its value (`expr = "raw.scores[420]"`; the closest values are proposed). Better, write results that hold the cited quantities, not the raw outputs. Expressions allow `+ - * /`, parentheses and numeric constants, and are never evaluated as Python.
 
-Candidates proposed for an untraced number are single operations over counts (sums, differences, shares), ranked by closeness in the results tree; none is proposed when more than 1,000 print as the number. They are hints: nothing is accepted until written into `audit.toml`.
+Candidates proposed for an untraced number are single operations over counts (sums, differences, shares), ranked by closeness in the results tree; none is proposed when more than 1,000 print as the number. They are hints: nothing is accepted until written into `osaudit.toml`.
 
 ### What is not audited as a number
 
@@ -130,7 +130,7 @@ A quote is ` ``...'' ` with a citation in the same sentence (the nearest after i
 
 ### Schema URLs
 
-Every structured data file names its schema in a mandatory `schema` key, the URL of a JSON Schema in [assert-research-agent/schemas](https://github.com/ASSERT-KTH/assert-research-agent/tree/main/schemas): `audit.toml` itself (`audit-v1`; without it the audit cannot run, exit 2), the results `provenance` block (`osaudit run` writes it), the front matter of audited Markdown documents, pre-registrations (`[study] prereg/*.md`) and exploration logs (`[study] explore/*.md`). `osaudit schema` reports `schema/missing` and `schema/unknown` (a URL that is not the schema for that kind of file); `run --prereg` refuses a pre-registration without it.
+Every structured data file names its schema in a mandatory `schema` key, the URL of a JSON Schema in [assert-research-agent/schemas](https://github.com/ASSERT-KTH/assert-research-agent/tree/main/schemas): `osaudit.toml` itself (`audit-v1`; without it the audit cannot run, exit 2), the results `provenance` block (`osaudit run` writes it), the front matter of audited Markdown documents, pre-registrations (`[study] prereg/*.md`) and exploration logs (`[study] explore/*.md`). `osaudit schema` reports `schema/missing` and `schema/unknown` (a URL that is not the schema for that kind of file); `run --prereg` refuses a pre-registration without it.
 
 ## Release
 

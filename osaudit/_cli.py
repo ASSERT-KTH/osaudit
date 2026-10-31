@@ -55,7 +55,8 @@ def parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--root", type=Path, default=Path("."),
                         help="paper repository (default: current directory)")
-    common.add_argument("--config", type=Path, help="audit.toml (default: <root>/audit.toml)")
+    common.add_argument("--config", type=Path,
+                        help="osaudit.toml (default: <root>/osaudit.toml, else audit.toml)")
     common.add_argument("--json", action="store_true",
                         help="print findings as a JSON array ([] when clean)")
     sub = p.add_subparsers(dest="check", metavar="CHECK")

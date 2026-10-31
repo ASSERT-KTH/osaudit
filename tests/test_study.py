@@ -95,7 +95,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "prereg/count.md").write_text(PREREG.format(amendments=""))
     (tmp_path / "explore/look.md").write_text(LOG)
     (tmp_path / "paper.tex").write_text("No numbers.\n")
-    (tmp_path / "audit.toml").write_text(AUDIT)
+    (tmp_path / "osaudit.toml").write_text(AUDIT)
     git(tmp_path, "init", "-q")
     commit(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -293,7 +293,7 @@ def test_derivation_with_exploratory_operand_is_exploratory(repo: Path) -> None:
     explore_train(repo)
     assert run("--prereg", "prereg/count.md") == 0
     commit(repo)
-    with (repo / "audit.toml").open("a") as f:
+    with (repo / "osaudit.toml").open("a") as f:
         f.write('\n[[numbers.derive]]\nvalue = "5"\nexpr = "look.rows + count.rows"\n')
     assert paper(repo, "Together 5 rows.\n") == ["numbers/exploratory-unlabelled"]
 

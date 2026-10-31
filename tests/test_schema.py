@@ -43,7 +43,7 @@ def git(root: Path, *args: str) -> None:
 def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for d in ("results", "prereg", "explore"):
         (tmp_path / d).mkdir()
-    (tmp_path / "audit.toml").write_text(AUDIT)
+    (tmp_path / "osaudit.toml").write_text(AUDIT)
     (tmp_path / "inst.py").write_text(INSTRUMENT)
     (tmp_path / "data.txt").write_text("x\n")
     (tmp_path / "findings.md").write_text(f'+++\nschema = "{DOCUMENT}"\n+++\nNo numbers.\n')
@@ -96,13 +96,23 @@ def test_markdown_without_front_matter_is_not_a_structured_file(repo: Path) -> N
     assert rules(repo) == []
 
 
-def test_audit_toml_without_schema_cannot_run(
+def test_legacy_audit_toml_is_still_read(repo: Path) -> None:
+    (repo / "osaudit.toml").rename(repo / "audit.toml")
+    assert main(["schema", "--root", str(repo)]) == 0
+
+
+def test_osaudit_toml_wins_over_legacy(repo: Path) -> None:
+    (repo / "audit.toml").write_text("not toml [")
+    assert main(["schema", "--root", str(repo)]) == 0
+
+
+def test_osaudit_toml_without_schema_cannot_run(
         repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (repo / "audit.toml").write_text(AUDIT.split("\n", 2)[2])  # drop the schema line
+    (repo / "osaudit.toml").write_text(AUDIT.split("\n", 2)[2])  # drop the schema line
     assert main(["schema", "--root", str(repo)]) == 2
     assert "first line must be schema" in capsys.readouterr().err
 
 
-def test_audit_toml_with_another_schema_cannot_run(repo: Path) -> None:
-    (repo / "audit.toml").write_text(AUDIT.replace("audit-v1", "audit-v9"))
+def test_osaudit_toml_with_another_schema_cannot_run(repo: Path) -> None:
+    (repo / "osaudit.toml").write_text(AUDIT.replace("audit-v1", "audit-v9"))
     assert main(["schema", "--root", str(repo)]) == 2
